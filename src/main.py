@@ -112,13 +112,10 @@ class Section:
     def __str__(self) -> str:
         section = "#" * self.level + f" {self.title}\n\n"
         for content in self.content:
-            section += str(content) + "\n\n"
+            section += str(content)
         return section  # Ensure the section string is returned
 
     def parse(self, root : List[SyntaxTreeNode] ):
-
-
-
         i = 0
         while i < len(root):
 
