@@ -26,6 +26,12 @@ def extract_meta_data(soup: BeautifulSoup) -> Dict[str, str]:
         'url': url
     }
 
+from markdownify import MarkdownConverter
+
+# Create shorthand method for conversion
+def md(soup, **options):
+    return MarkdownConverter(**options).convert_soup(soup)
+
 def process_wiki_pages(raw_folder_path: str, save_folder_path: str):
     """
     This function processes a raw html of a wiki page, specifically from Torn Wiki. Might work with other wikipedia pages. Especially if they are run using MediaWiki.
@@ -71,8 +77,7 @@ def process_wiki_pages(raw_folder_path: str, save_folder_path: str):
 
 
 
-            h = html2text.HTML2Text()
-            h.ignore_links = True
+
 
             ## Convert HTML to markdown
             markdown = ("---\n"
@@ -81,7 +86,7 @@ def process_wiki_pages(raw_folder_path: str, save_folder_path: str):
                         "updated: {}\n"
                         "---\n").format("Torn Wiki", meta_data['url'], "2025-07-15")
 
-            markdown += h.handle(str(content))
+            markdown += md(content)
 
             ## Save the processed page
             with open(os.path.join(save_folder_path, f"{meta_data['title'].replace('/', '')}.md"), 'w') as f:
