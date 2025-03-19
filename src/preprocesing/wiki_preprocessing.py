@@ -63,11 +63,13 @@ def process_wiki_pages(raw_folder_path: str, save_folder_path: str):
             for tr in soup.find_all("tr"):
                 th = tr.find("th", class_="header")
                 if th:
-                    table_caption = f'**Table: {th.text}**:'
+                    table_caption = f'**Table: {th.text.rstrip()}**:'
                     new_caption = soup.new_tag("p")  # Create a new <p> tag
                     new_caption.string = table_caption  # Set its text
                     tr.insert_before(new_caption)  # Insert it before the <tr> (will work as table caption)
                     tr.decompose()  # Remove the original <tr>
+
+
 
             h = html2text.HTML2Text()
             h.ignore_links = True
