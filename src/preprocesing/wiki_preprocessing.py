@@ -26,7 +26,8 @@ def extract_meta_data(soup: BeautifulSoup) -> Dict[str, str]:
         'url': url
     }
 
-from markdownify import MarkdownConverter
+from markdownify import MarkdownConverter, markdownify
+
 
 # Create shorthand method for conversion
 def md(soup, **options):
@@ -105,3 +106,5 @@ if __name__ == '__main__':
     raw_path = 'wiki'
     save_path = 'data'
     process_wiki_pages(raw_path, save_path)
+
+

@@ -258,8 +258,6 @@ if __name__ == '__main__':
 
     print(document)
 
-
-
     exit(0)
 
     chunks = create_chunks("../data/Pickpocketing -  Torncity WIKI - The official help and support guide.md")
