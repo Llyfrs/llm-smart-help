@@ -1,12 +1,14 @@
 [project]
-name = "pythonproject"
+name = "llm-smart-project"
 version = "0.1.0"
 description = ""
 package-mode = false
-
+packages = [{include = "src"}]
 authors = [
     {name = "llyfr",email = "k.dreiseitl@seznam.cz"}
 ]
+
+
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -18,7 +20,8 @@ dependencies = [
     "html2text (>=2024.2.26,<2025.0.0)",
     "sentence-transformers (>=3.4.1,<4.0.0)",
     "markdown-it-py (>=3.0.0,<4.0.0)",
-    "markdownify (>=1.1.0,<2.0.0)"
+    "markdownify (>=1.1.0,<2.0.0)",
+    "black (>=25.1.0,<26.0.0)"
 ]
 
 
