@@ -3,6 +3,7 @@ from typing import LiteralString, Literal
 
 import psycopg2
 from psycopg2.extras import execute_batch
+from tqdm import tqdm
 
 from src.vectordb.vector import Vector
 
@@ -97,11 +98,7 @@ class VectorStorage:
 
     def insert(
         self,
-        file_name: str,
-        file_position: int,
-        content: str,
-        vector: list[float],
-        metadata: dict = None,
+        vector: Vector
     ):
         """
         Insert a new vector into the database.
@@ -118,24 +115,25 @@ class VectorStorage:
                 """
 
         self.cursor.execute(
-            query, (vector, file_name, file_position, content, json.dumps(metadata))
+            query, (vector, vector.file_name, vector.file_position, vector.content, json.dumps(vector.metadata))
         )
         self.connection.commit()
 
     def batch_insert(
             self,
-            entries: list[dict],
-            batch_size: int = 1000
+            entries: list[Vector],
+            batch_size: int = 1000,
+            page_size: int = 500,
+            verbose: bool = False
     ):
         """
         Efficient batch insert using psycopg2's execute_batch
-        :param entries: List of dictionaries with keys:
-            - vector: list[float]
-            - file_name: str
-            - file_position: int
-            - content: str
-            - metadata: dict (optional)
+
+
+        :param entries: List of Vector objects to insert. Note that ID and updated_at fields are ignored.
         :param batch_size: Number of records per batch (default 1000)
+        :param page_size:  Number of records per page (executed on the database) (default 500)
+        :param verbose: Whether to show progress bar (default False)
         """
         if not entries:
             return
@@ -149,11 +147,11 @@ class VectorStorage:
         # Prepare data tuples in correct order
         data = [
             (
-                entry["vector"],
-                entry["file_name"],
-                entry["file_position"],
-                entry["content"],
-                json.dumps(entry.get("metadata"))  # Convert dict to JSON string
+                entry.vector,
+                entry.file_name,
+                entry.file_position,
+                entry.content,
+                json.dumps(entry.metadata)
             )
             for entry in entries
         ]
@@ -162,7 +160,12 @@ class VectorStorage:
 
         for i in range(0, len(data), batch_size):
             batch = data[i:i + batch_size]
-            execute_batch(self.cursor, query, batch, page_size=500)
+            if verbose:
+                with tqdm(total=len(data), desc="Inserting Batches", unit="batch") as pbar:
+                    execute_batch(self.cursor, query, batch, page_size=page_size)
+                    pbar.update(len(batch))
+            else:
+                execute_batch(self.cursor, query, batch, page_size=page_size)
             self.connection.commit()
 
 

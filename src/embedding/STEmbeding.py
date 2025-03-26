@@ -11,7 +11,7 @@ class STEmbedding(EmbeddingModel):
 
     def __init__(self, model_name, *args, **kwargs):
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name, device="cuda", *args, **kwargs)
+        self.model = SentenceTransformer(model_name, *args, **kwargs)
         super().__init__()
 
     def embed(self, data):
