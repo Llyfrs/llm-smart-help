@@ -27,8 +27,6 @@ import time
 from typing import Dict
 
 
-
-
 def _extract_meta_data(soup: BeautifulSoup) -> Dict[str, str]:
     """
     This function extracts relevant data like title, the page url, and other possible information.
@@ -51,7 +49,7 @@ from markdownify import MarkdownConverter, markdownify
 
 
 # Create shorthand method for conversion
-def _md(soup : BeautifulSoup, **options):
+def _md(soup: BeautifulSoup, **options):
     """
     Convert a BeautifulSoup object to markdown
     :param soup: BeautifulSoup object
@@ -144,15 +142,24 @@ def process_wiki_pages(
                     )  # Insert it before the <tr> (will work as table caption)
                     tr.decompose()  # Remove the original <tr>
 
+
+            ## Remove new-infobox class
+            for div in soup.find_all("div", class_="new-infobox"):
+                div.decompose()
+
+
+
             soup = _fix_markdown_tables(soup)
 
             ## Convert HTML to markdown
-#            markdown = (
-#                "---\n" "source: {}\n" "url: {}\n" "updated: {}\n" "---\n"
-#           ).format(source, meta_data["url"], "2025-07-15")
+            #            markdown = (
+            #                "---\n" "source: {}\n" "url: {}\n" "updated: {}\n" "---\n"
+            #           ).format(source, meta_data["url"], "2025-07-15")
 
             ## add metadata to the file
-            metadata_str = "".join([f"{key}: {value}\n" for key, value in meta_data.items()])
+            metadata_str = "".join(
+                [f"{key}: {value}\n" for key, value in meta_data.items()]
+            )
             metadata_str += f"url: {url}\n"
             markdown = f"---\n{metadata_str}---\n"
 
@@ -160,9 +167,7 @@ def process_wiki_pages(
 
             ## Save the processed page
             with open(
-                os.path.join(
-                    save_folder_path, f"{title.replace('/', '')}.md"
-                ),
+                os.path.join(save_folder_path, f"{title.replace('/', '')}.md"),
                 "w",
             ) as f:
                 f.write(markdown)
@@ -179,4 +184,6 @@ if __name__ == "__main__":
     """
     raw_path = "../wiki"
     save_path = "../data"
-    process_wiki_pages(raw_path, save_path, {"source": "Torn Wiki", "updated": "2025-07-15"})
+    process_wiki_pages(
+        raw_path, save_path, {"source": "Torn Wiki", "updated": "2025-07-15"}
+    )

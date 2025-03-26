@@ -20,6 +20,18 @@ class STEmbedding(EmbeddingModel):
     def tokenize(self, data):
         return self.model.tokenize(data)
 
+    def get_token_length(self, text):
+        """Returns exact token count including special tokens"""
+        return len(self.model.tokenizer.encode(text, add_special_tokens=True))
+
+    @property
+    def dimension(self):
+        return self.model.get_sentence_embedding_dimension()
+
+    @property
+    def max_seq_length(self):
+        return self.model.max_seq_length
+
     def metadata(self) -> Dict[str, Any]:
         return {
             # Current fields

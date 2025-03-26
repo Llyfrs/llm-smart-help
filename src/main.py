@@ -1,115 +1,177 @@
 """
 This is the main file for the project.
 """
-
+import logging
 import os
-from dataclasses import dataclass, field
-from typing import List, Any, Dict, Union
+import time
 
-import numpy as np
-from markdown_it.token import Token
-from markdown_it.tree import SyntaxTreeNode
+
+from dotenv import load_dotenv
 from tqdm import tqdm
+
 from src.embedding.STEmbeding import STEmbedding
-
-from markdown_it import MarkdownIt
-import re
-
+from src.preprocesing.document_parsing.bullet_list import BulletList
+from src.preprocesing.document_parsing.document import Document
 from src.preprocesing.document_parsing.document_parser import DocumentParser
+from src.preprocesing.document_parsing.paragraph import Paragraph
 from src.preprocesing.document_parsing.section import Section
+from src.preprocesing.document_parsing.table import Table
+from src.preprocesing.html_to_markdown import process_wiki_pages
+from src.vectordb.vector_storage import VectorStorage
 
+
+def get_chunks(model: STEmbedding, storage: VectorStorage):
+    files = os.listdir("data")
+
+    # Read and parse documents first
+    documents = []
+    for file in tqdm(files, desc="Reading Files", unit="file"):
+        with open(os.path.join("data", file), "r") as f:
+            data = f.read()
+            documents.append(
+                DocumentParser(file_name=file).parse(data)
+            )
+
+
+    # Collect all chunks with their metadata
+    all_chunks = []
+
+    with tqdm(total=len(documents), desc="Processing Documents", unit="doc") as pbar:
+        for document in documents:
+            doc_position = 0  # Position counter for this document
+            queue = [document]
+
+            while queue:
+
+                section = queue.pop(0)
+                content = str(section)
+
+                tokens = model.get_token_length(content)
+
+                skipped = 0
+
+                if tokens <= model.max_seq_length:
+                    # Collect chunk data for later processing
+                    all_chunks.append({
+                        "content": content,
+                        "file_name": document.file_name,
+                        "file_position": doc_position,
+                        "metadata": document.metadata
+                    })
+                    doc_position += 1
+                    continue
+
+                # Process subsections if content is too long
+                if isinstance(section, Document):
+                    queue.extend(section.sections)
+                elif isinstance(section, Section):
+                    queue.extend(section.content)
+                elif isinstance(section, Table):
+
+                    ## This unfotunatelly does happen on smaller models
+                    if len(section.rows) == 1:
+                        logging.warning(f"Skipping single row table in {document.file_name}")
+                        continue
+
+                    # Split table rows into two halves
+                    rows = round(len(section.rows) /  2)
+                    queue.extend([
+                        Table( headers=section.headers, rows=section.rows[:rows], caption=section.caption),
+                        Table( headers=section.headers, rows=section.rows[rows:], caption=section.caption)
+                    ])
+
+                elif isinstance(section, BulletList):
+
+                    if len(section.items) == 1:
+                        logging.warning(f"Skipping single item bullet list in {document.file_name}")
+                        continue
+
+                    # Split bullet list into two halves
+                    items = round(len(section.items) / 2)
+                    queue.extend([
+                        BulletList(items=section.items[:items]),
+                        BulletList(items=section.items[items:])
+                    ])
+                elif isinstance(section, Paragraph):
+                    # Split paragraph into two halves
+
+                    content = section.content
+
+                    half = round(len(content) / 2)
+                    queue.extend([
+                        Paragraph(content=content[:half]),
+                        Paragraph(content=content[half:]),
+                    ])
+
+                else:
+                    print(f"Skipping {section.__class__.__name__} with {tokens} tokens")
+
+            pbar.update(1)
+
+
+    print(f"Total chunks: {len(all_chunks)}")
+
+    # Batch embed all contents at once
+    if all_chunks:
+        # Step 1: Extract all contents for batch embedding
+        contents = [chunk["content"] for chunk in all_chunks]
+
+        # Step 2: Batch embed all contents at once
+        vectors = model.embed(contents)
+
+        # Step 3: Prepare data for batch insertion
+        entries = [
+            {
+                "vector": vector.tolist(),
+                "file_name": chunk["file_name"],
+                "file_position": chunk["file_position"],
+                "content": chunk["content"],
+                "metadata": chunk["metadata"]
+            }
+            for chunk, vector in zip(all_chunks, vectors)
+        ]
+
+        # measure the time taken to insert the data
+        start_time = time.time()
+
+        # Step 4: Batch insert all entries
+        storage.batch_insert(entries, batch_size=2000)  # Adjust batch_size as needed
+
+        end_time = time.time()
+        print(f"Time taken to insert data: {end_time - start_time} seconds")
 
 
 if __name__ == "__main__":
 
-    # file = "../data/Ammo -  Torncity WIKI - The official help and support guide.md"
-    file = "../data/Pickpocketing -  Torncity WIKI - The official help and support guide.md"
-
-    with open(file, "r") as f:
-        data = f.read()
-
-    document = DocumentParser(file).parse(data)
+    # Load the document parser
 
 
-    print(document)
+    load_dotenv()
+    connection_string = os.getenv("POSTGRESQL_CONNECTION_STRING")
 
+    model = STEmbedding("intfloat/multilingual-e5-large-instruct")
 
-    exit(0)
-
-    chunks = create_chunks(
-        "../data/Pickpocketing -  Torncity WIKI - The official help and support guide.md"
-    )
-
-    for chunk in chunks:
-        print(chunk)
-
-    exit(0)
-
-    model = STEmbedding("sentence-transformers/paraphrase-MiniLM-L6-v2")
     print("Embedding model loaded successfully!")
 
-    print(model.metadata())
-
-    vectors = []  # Store embedding vectors
-    text_data = []  # Store the corresponding text content
-
-    # Get all files and calculate total lines for accurate progress tracking
-    total_lines = 0
-    files = os.listdir("data")
-    for file in files:
-        with open(os.path.join("data", file), "r") as f:
-            total_lines += len(f.readlines())
-
-    # Process files with a nice progress bar
-    with tqdm(total=total_lines, desc="Processing data", unit="lines") as pbar:
-        for file in files:
-            with open(os.path.join("data", file), "r") as f:
-                data = f.read()
-
-                data = data.split("\n")
-
-                filtered_data = [
-                    line.strip() for line in data if len(line.strip()) > 0
-                ]  # Filter out empty lines
-
-                # Store the original text
-                text_data.extend(filtered_data)
-
-                # Embed the data
-                vectors.extend(model.embed(filtered_data))
-
-                pbar.update(len(data))
-
-    # Convert list to numpy array only once, more efficient
-    vectors = np.vstack(vectors)
-
-    print(
-        f"Processed {len(vectors)} text segments into embeddings of shape {vectors.shape}"
+    table = VectorStorage(
+        name="MiniLM", dimension=model.dimension, connection_string=connection_string
     )
 
-    # Process query with its own progress bar
-    query = [
-        "What is the best weapon in the game?",
-        "How do I get more gold?",
-        "What is the best way to level up?",
-    ]
 
-    with tqdm(total=len(query), desc="Processing queries", unit="query") as pbar:
-        query_vectors = model.embed(query)
-        pbar.update(len(query))
+    # get_chunks(model, table)
 
-    # Calculate similarities
-    print("Calculating similarities...")
-    results = np.dot(
-        vectors, query_vectors.T
-    )  # Transpose to get proper shape for matrix multiplication
 
-    # Display top results for each query
-    for i, q in enumerate(query):
-        print(f"\nTop 5 results for query: '{q}'")
-        top_indices = np.argsort(results[:, i])[-5:][::-1]  # Get top 5 indices
-        for idx in top_indices:
-            # Show score and text (truncated if longer than 100 chars)
-            text = text_data[idx]
-            display_text = text[:100] + "..." if len(text) > 100 else text
-            print(f"Score: {results[idx, i]:.4f} | Text: {display_text}")
+
+
+    while True:
+
+        querry = input("Enter the query: ")
+
+        query_vector = model.embed([querry])[0].tolist()
+
+        results = table.query(query_vector, n=5, distance="cosine")
+
+        for result in results:
+            print(result.file_name)
+            print(result.content)
+            print("-------------------")

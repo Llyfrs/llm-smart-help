@@ -12,6 +12,3 @@ class BulletList:
             bullet_list += f"- {item}\n"
 
         return bullet_list
-
-
-

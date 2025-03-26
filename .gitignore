@@ -13,3 +13,4 @@ poetry.lock.bak
 
 data/*
 wiki/
+/models.tom

@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from typing import List
 
 
-
-
 @dataclass
 class Table:
     caption: str
@@ -24,4 +22,3 @@ class Table:
             table += "|" + "|".join(row) + "| \n"
 
         return table
-

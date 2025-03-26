@@ -13,9 +13,6 @@ from src.preprocesing.document_parsing.section import Section
 from src.preprocesing.document_parsing.table import Table
 
 
-
-
-
 class DocumentParser:
     """
     Parses a markdown document into a Document object.
@@ -60,10 +57,11 @@ class DocumentParser:
             end = document.find("---", 3)
             if end != -1:
                 metadata_text = document[3:end].strip()
-                document = document[end + 3:]
+                document = document[end + 3 :]
                 metadata = {
                     key.strip(): value.strip()
-                    for line in metadata_text.split("\n") if ":" in line
+                    for line in metadata_text.split("\n")
+                    if ":" in line
                     for key, value in [line.split(":", 1)]
                 }
 
@@ -76,7 +74,9 @@ class DocumentParser:
         content = self._parse_nodes(root.children)
         return Document(file_name=self.file_name, metadata=metadata, sections=content)
 
-    def _parse_nodes(self, nodes: List[SyntaxTreeNode]) -> List[Union[Section, Paragraph, Table, Image, BulletList]]:
+    def _parse_nodes(
+        self, nodes: List[SyntaxTreeNode]
+    ) -> List[Union[Section, Paragraph, Table, Image, BulletList]]:
         """
         Recursively parses a list of syntax tree nodes into a list of document components.
         """
@@ -113,7 +113,11 @@ class DocumentParser:
                     # Even in that case, at least it provides context.
 
                     try:
-                        caption = self._decode_inline(nodes[i - 1].children[0].token.children) if i > 0 and nodes[i - 1].children else ""
+                        caption = (
+                            self._decode_inline(nodes[i - 1].children[0].token.children)
+                            if i > 0 and nodes[i - 1].children
+                            else ""
+                        )
                     except:
                         caption = ""
 
@@ -143,8 +147,6 @@ class DocumentParser:
                 i += 1  # Skip unhandled node types
         return result
 
-
-
     def _collect_list(self, children: [SyntaxTreeNode]):
         result = []
         for child in children:
@@ -155,8 +157,11 @@ class DocumentParser:
             elif child.type == "ordered_list":
                 result.extend(self._collect_list(child.children))
             elif child.type == "paragraph":
-                result.append(self._decode_inline(child.children[0].token.children) if child.children[0].token.children else "")
-
+                result.append(
+                    self._decode_inline(child.children[0].token.children)
+                    if child.children[0].token.children
+                    else ""
+                )
 
         return result
 
@@ -180,4 +185,3 @@ class DocumentParser:
                 text += "\n"
 
         return text
-
