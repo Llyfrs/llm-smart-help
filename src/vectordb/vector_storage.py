@@ -156,18 +156,13 @@ class VectorStorage:
             for entry in entries
         ]
 
-        # Use execute_batch with progress tracking
-
-        for i in range(0, len(data), batch_size):
-            batch = data[i:i + batch_size]
-            if verbose:
-                with tqdm(total=len(data), desc="Inserting Batches", unit="batch") as pbar:
-                    execute_batch(self.cursor, query, batch, page_size=page_size)
-                    pbar.update(len(batch))
-            else:
+    # Use execute_batch with progress tracking
+        with tqdm(total=len(data), desc="Inserting Batches", unit="batch", disable=not verbose) as pbar:
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
                 execute_batch(self.cursor, query, batch, page_size=page_size)
-            self.connection.commit()
-
+                pbar.update(len(batch))
+                self.connection.commit()
 
     def query(self, vector: list[float], n: int = 10, distance: Literal["l2", "inner_product", "cosine", "l1", "hamming", "jaccard"] = "inner_product")  -> list[Vector]:
 

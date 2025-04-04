@@ -3,7 +3,10 @@ This is the main file for the project.
 """
 import logging
 import os
+import re
 import time
+
+import toml
 
 
 from dotenv import load_dotenv
@@ -11,13 +14,10 @@ from tqdm import tqdm
 from transformers.models.donut.processing_donut import DonutProcessorKwargs
 
 from src.embedding.STEmbeding import STEmbedding
-from src.preprocesing.document_parsing.bullet_list import BulletList
-from src.preprocesing.document_parsing.document import Document
-from src.preprocesing.document_parsing.document_loader import DocumentLoader
+from src.models.llmodel import LLModel
+from src.preprocesing.chunker import Chunker
+
 from src.preprocesing.document_parsing.document_parser import DocumentParser
-from src.preprocesing.document_parsing.paragraph import Paragraph
-from src.preprocesing.document_parsing.section import Section
-from src.preprocesing.document_parsing.table import Table
 from src.vectordb.vector import Vector
 from src.vectordb.vector_storage import VectorStorage
 
@@ -26,124 +26,75 @@ def get_chunks(model: STEmbedding, storage: VectorStorage):
     files = os.listdir("data")
 
     # Read and parse documents first
-    documents = DocumentLoader(path="data", verbose=True).load()
+    documents = []
+
+    # Set up tqdm with conditional verbosity
+    progress_bar = tqdm(enumerate(files, 1), desc="Reading Files", unit="file", disable=not self.verbose)
+
+    for i, file in progress_bar:
+        file_path = os.path.join(self.path, file)
+
+        with open(file_path, "r") as f:
+            data = f.read()
+            document = DocumentParser(file_name=file).parse(data)
+            documents.append(document)
 
     # Collect all chunks with their metadata
     all_chunks = []
 
+    chunker = Chunker(chunk_size=model.dimension, chunk_strategy="max_tokens", tokenizer=model.tokenize)
+
     with tqdm(total=len(documents), desc="Processing Documents", unit="doc") as pbar:
         for document in documents:
-            doc_position = 0  # Position counter for this document
-            queue = [document]
-
-            while queue:
-
-                section = queue.pop(0)
-                content = str(section)
-
-                tokens = model.get_token_length(content)
-
-                skipped = 0
-
-                if tokens <= model.max_seq_length:
-                    # Collect chunk data for later processing
-                    all_chunks.append(
-                        Vector(
-                            vector=[],
-                            file_name=document.file_name,
-                            file_position=doc_position,
-                            content=content,
-                            metadata=document.metadata
-                        )
-                    )
-                    doc_position += 1
-                    continue
-
-                # Process subsections if content is too long
-                if isinstance(section, Document):
-                    queue.extend(section.sections)
-                elif isinstance(section, Section):
-                    queue.extend(section.content)
-                elif isinstance(section, Table):
-
-                    ## This unfotunatelly does happen on smaller models
-                    if len(section.rows) <= 1:
-                        logging.warning(f"Skipping single row table in {document.file_name}")
-                        continue
-
-                    # Split table rows into two halves
-                    rows = round(len(section.rows) /  2)
-                    queue.extend([
-                        Table( headers=section.headers, rows=section.rows[:rows], caption=section.caption),
-                        Table( headers=section.headers, rows=section.rows[rows:], caption=section.caption)
-                    ])
-
-                elif isinstance(section, BulletList):
-
-                    if len(section.items) == 1:
-                        logging.warning(f"Skipping single item bullet list in {document.file_name}")
-                        continue
-
-                    # Split bullet list into two halves
-                    items = round(len(section.items) / 2)
-                    queue.extend([
-                        BulletList(items=section.items[:items]),
-                        BulletList(items=section.items[items:])
-                    ])
-                elif isinstance(section, Paragraph):
-                    # Split paragraph into two halves
-
-                    content = section.content
-
-                    half = round(len(content) / 2)
-                    queue.extend([
-                        Paragraph(content=content[:half]),
-                        Paragraph(content=content[half:]),
-                    ])
-
-                else:
-                    print(f"Skipping {section.__class__.__name__} with {tokens} tokens")
-
+            all_chunks.extend(chunker.chunk(document))
             pbar.update(1)
 
 
     print(f"Total chunks: {len(all_chunks)}")
 
-    exit(0)
-
     # Batch embed all contents at once
-    if all_chunks:
-        # Step 1: Extract all contents for batch embedding
-        contents = [chunk.content for chunk in all_chunks]
+    if len(all_chunks) == 0:
+        print("No chunks we created.")
+        return
 
-        # Step 2: Batch embed all contents at once
-        vectors = model.embed(contents)
 
-        # Step 3: Prepare data for batch insertion
-        entries = []
-        for chunk, vector in zip(all_chunks, vectors):
-            chunk.vector = vector.tolist()
-            entries.append(chunk)
+    # Step 1: Extract all contents for batch embedding
+    contents = [chunk.content for chunk in all_chunks]
 
-        # measure the time taken to insert the data
-        start_time = time.time()
+    batch_size = 100
+    vectors = []
+    with tqdm(total=len(contents), desc="Embedding Contents", unit="content") as pbar:
+        for i in range(0, len(contents), batch_size):
+            batch = contents[i:i + batch_size]
+            vectors.extend(model.embed(batch))
+            pbar.update(len(batch))
 
-        # Step 4: Batch insert all entries
-        storage.batch_insert(entries, batch_size=2000, verbose=True)  # Adjust batch_size as needed
+    # Step 3: Prepare data for batch insertion
+    entries = []
+    for chunk, vector in zip(all_chunks, vectors):
+        v = Vector.from_chunk(chunk, vector.tolist())
+        entries.append(v)
 
-        end_time = time.time()
-        print(f"Time taken to insert data: {end_time - start_time} seconds")
+    # measure the time taken to insert the data
+    start_time = time.time()
+
+    # Step 4: Batch insert all entries
+    storage.batch_insert(entries, batch_size=2000, verbose=True)  # Adjust batch_size as needed
+
+    end_time = time.time()
+    print(f"Time taken to insert data: {end_time - start_time} seconds")
 
 
 if __name__ == "__main__":
 
     # Load the document parser
 
+    toml_file = "config.toml"
+    config = toml.load(toml_file)
 
-    load_dotenv()
-    connection_string = os.getenv("POSTGRESQL_CONNECTION_STRING")
+    connection_string = config["POSTGRESQL_CONNECTION_STRING"]
 
-    model = STEmbedding("intfloat/multilingual-e5-large-instruct", cache_folder="cache")
+    model = STEmbedding("intfloat/multilingual-e5-large-instruct")
 
     print("Embedding model loaded successfully!")
 
@@ -152,17 +103,41 @@ if __name__ == "__main__":
     )
 
 
+    llmodel = LLModel(
+        model_name=config["model"][list(config["model"].keys())[0]]["MODEL_NAME"],
+        endpoint=config["model"][list(config["model"].keys())[0]]["ENDPOINT_URL"],
+        api_key=config["model"][list(config["model"].keys())[0]]["API_KEY"],
+        system_prompt="Based on provided context, answer the question.",
+    )
+
+    print("LLM model loaded successfully!")
+
+
     get_chunks(model, table)
+
+    def get_detailed_instruct(task_description: str, query: str) -> str:
+        return f'Instruct: {task_description}\nQuery: {query}'
+
 
     while True:
 
         querry = input("Enter the query: ")
 
+        querry = get_detailed_instruct("Given provided query, retrieve documents that best answer asked question. Do not acknowledge the context. Refuse to answer non game questions or when no context to user question was found", querry)
+
         query_vector = model.embed([querry])[0].tolist()
 
         results = table.query(query_vector, n=5, distance="cosine")
 
+        context = "Ccntext:\n\n"
         for result in results:
-            print(result.file_name)
-            print(result.content)
-            print("-------------------")
+            context += result.content + "\n\n"
+
+
+        print(f"Context: {context}")
+
+        context += "Question:\n\n"
+
+        llmodel_response = llmodel.generate_response(prompt=context + querry)
+
+        print(f"LLM Response: {llmodel_response}")

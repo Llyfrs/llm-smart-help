@@ -88,11 +88,50 @@ def _fix_markdown_tables(soup):
     return soup
 
 
+def _fix_signs(soup):
+    """
+    This function encloses any text in <li> containing '-' or '+' to be enclosed with '' to not be converted to a list.
+    When we keep them they get latter detected as a list and converted to a list in markdown, loosing information.
+    :param soup:
+    :return:
+    """
+
+    # Find all <li> elements
+    for li in soup.find_all("li"):
+        # Check if the text contains '-' or '+'
+        if "-" in li.text or "+" in li.text:
+            # Create a new <span> element
+            new = soup.new_tag("li")
+            new.string = '\'' + li.text + '\''
+            # Replace li with span
+            li.replace_with(new)
+
+    return soup
+
+def __remove_patch_history(soup):
+    """
+    This function removes all elements after  patch history from the soup object. Specifically the <span class="mw-headline" id="Patch_History">Patch History</span> element
+    Patch history usually doesnẗ contain any relevant information.
+    :param soup:
+    :return:
+    """
+    # Find all <span> elements with class "mw-headline" and id "Patch_History"
+    patch_history = soup.find("span", {"class": "mw-headline", "id": "Patch_History"})
+    if patch_history:
+        # Remove all elements after the patch history
+        for element in patch_history.find_all_next():
+            element.decompose()
+        # Remove the patch history element itself
+        patch_history.decompose()
+
+    return soup
+
 def process_wiki_pages(
     raw_folder_path: str, save_folder_path: str, meta_data: Dict[str, str] = None
 ) -> None:
     """
     This function processes a raw html of a wiki page, specifically from Torn Wiki. Might work with other wikipedia pages. Especially if they are run using MediaWiki.
+    But in general you will want to use our own parser so you can clean the data in any way you want.
 
 
     :param raw_folder_path: Folder with raw html files
@@ -150,6 +189,8 @@ def process_wiki_pages(
 
 
             soup = _fix_markdown_tables(soup)
+            soup = _fix_signs(soup)
+            soup = __remove_patch_history(soup)
 
             ## Convert HTML to markdown
             #            markdown = (

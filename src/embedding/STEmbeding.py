@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from src.embedding.EmbeddingModel import EmbeddingModel
 from sentence_transformers import SentenceTransformer
@@ -17,8 +17,8 @@ class STEmbedding(EmbeddingModel):
     def embed(self, data):
         return self.model.encode(data, normalize_embeddings=True)
 
-    def tokenize(self, data):
-        return self.model.tokenize(data)
+    def tokenize(self, data: str) -> List[int]:
+        return self.model.tokenizer.encode(data, add_special_tokens=True)
 
     def get_token_length(self, text):
         """Returns exact token count including special tokens"""
