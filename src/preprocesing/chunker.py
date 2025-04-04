@@ -9,7 +9,6 @@ from src.preprocesing.document_parsing.document import Document
 from src.preprocesing.document_parsing.paragraph import Paragraph
 from src.preprocesing.document_parsing.section import Section
 from src.preprocesing.document_parsing.table import Table
-from src.vectordb.vector import Vector
 
 import tiktoken
 

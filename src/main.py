@@ -9,9 +9,7 @@ import time
 import toml
 
 
-from dotenv import load_dotenv
 from tqdm import tqdm
-from transformers.models.donut.processing_donut import DonutProcessorKwargs
 
 from src.embedding.STEmbeding import STEmbedding
 from src.models.llmodel import LLModel
@@ -113,7 +111,7 @@ if __name__ == "__main__":
     print("LLM model loaded successfully!")
 
 
-    get_chunks(model, table)
+    # get_chunks(model, table)
 
     def get_detailed_instruct(task_description: str, query: str) -> str:
         return f'Instruct: {task_description}\nQuery: {query}'
@@ -123,13 +121,13 @@ if __name__ == "__main__":
 
         querry = input("Enter the query: ")
 
-        querry = get_detailed_instruct("Given provided query, retrieve documents that best answer asked question. Do not acknowledge the context. Refuse to answer non game questions or when no context to user question was found", querry)
+        querry = get_detailed_instruct("Given provided query, retrieve documents that best answer asked question.", querry)
 
         query_vector = model.embed([querry])[0].tolist()
 
         results = table.query(query_vector, n=5, distance="cosine")
 
-        context = "Ccntext:\n\n"
+        context = "Context:\n\n"
         for result in results:
             context += result.content + "\n\n"
 
@@ -138,6 +136,6 @@ if __name__ == "__main__":
 
         context += "Question:\n\n"
 
-        llmodel_response = llmodel.generate_response(prompt=context + querry)
+        llmodel_response = llmodel.generate_response(prompt=querry, image_urls = ["https://www.spaceplacestorage.com/wp-content/uploads/2016/01/google-small-icon-300x300.png"])
 
         print(f"LLM Response: {llmodel_response}")
