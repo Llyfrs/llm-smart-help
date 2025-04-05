@@ -1,17 +1,24 @@
 from typing import List
 import numpy as np
+from abc import ABC, abstractmethod
 
 
-class EmbeddingModel:
+class EmbeddingModel(ABC):
     """
-    Super class for all embedding models.
+    Abstract base class for all embedding models.
     """
 
+    @abstractmethod
     def embed(self, data: List[str]) -> List[np.array]:
-        raise NotImplementedError("EmbeddingModel::embed method is not implemented")
+        """Embed a list of strings into a list of vectors."""
+        pass
 
+    @abstractmethod
     def tokenize(self, data: List[str]) -> List[List[str]]:
-        raise NotImplementedError("EmbeddingModel::tokenize method is not implemented")
+        """Tokenize a list of strings into a list of tokens."""
+        pass
 
+    @abstractmethod
     def metadata(self) -> str:
-        raise NotImplementedError("EmbeddingModel::metadata method is not implemented")
+        """Return metadata about the embedding model."""
+        pass

@@ -30,11 +30,9 @@ class LLModel(Model):
     def generate_response(self, prompt: str, image_urls: Optional[list[str]] = None) -> str:
         """
         Generate a response from the model.
-        :param image_urls:
-        :param prompt: The input prompt for the model
-        :param temperature: Sampling temperature
-        :param max_tokens: Maximum number of tokens to generate
-        :return: Model response
+        :param image_urls: List of image URLs to be included in the prompt, the model needs to support vision.
+        :param prompt: The input prompt for the model.
+        :return: Model response.
         """
 
         images = []
@@ -59,7 +57,6 @@ class LLModel(Model):
                 }
             ],
         )
-
 
         self.usage = response.usage
 
