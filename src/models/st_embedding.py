@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 
-from src.embedding.EmbeddingModel import EmbeddingModel
+from src.models.embedding_model import EmbeddingModel
 from sentence_transformers import SentenceTransformer
 
 
@@ -8,7 +8,6 @@ class STEmbedding(EmbeddingModel):
     """
     Wrapper class for the SentenceTransformer library.
     """
-
     def __init__(self, model_name, *args, **kwargs):
         self.model_name = model_name
         self.model = SentenceTransformer(model_name, *args, **kwargs)
@@ -20,17 +19,9 @@ class STEmbedding(EmbeddingModel):
     def tokenize(self, data: str) -> List[int]:
         return self.model.tokenizer.encode(data, add_special_tokens=True)
 
-    def get_token_length(self, text):
-        """Returns exact token count including special tokens"""
-        return len(self.model.tokenizer.encode(text, add_special_tokens=True))
-
     @property
     def dimension(self):
         return self.model.get_sentence_embedding_dimension()
-
-    @property
-    def max_seq_length(self):
-        return self.model.max_seq_length
 
     def metadata(self) -> Dict[str, Any]:
         return {

@@ -1,11 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-
-from dataclasses import dataclass
-from typing import List, Optional
-
-from src.preprocesing.chunk import Chunk
+from src.document_parsing import Chunk
 
 
 @dataclass

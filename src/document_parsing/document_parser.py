@@ -5,12 +5,12 @@ from typing import List, Union, Dict
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 
-from src.preprocesing.document_parsing.bullet_list import BulletList
-from src.preprocesing.document_parsing.document import Document
-from src.preprocesing.document_parsing.image import Image
-from src.preprocesing.document_parsing.paragraph import Paragraph
-from src.preprocesing.document_parsing.section import Section
-from src.preprocesing.document_parsing.table import Table
+from .bullet_list import BulletList
+from .document import Document
+from .image import Image
+from .paragraph import Paragraph
+from .section import Section
+from .table import Table
 
 
 class DocumentParser:

@@ -1,9 +1,7 @@
 """
 This is the main file for the project.
 """
-import logging
 import os
-import re
 import time
 
 import toml
@@ -11,26 +9,28 @@ import toml
 
 from tqdm import tqdm
 
-from src.embedding.STEmbeding import STEmbedding
+from src.models import OAEmbedding, EmbeddingModel
+from src.models.st_embedding import STEmbedding
 from src.models.llmodel import LLModel
-from src.preprocesing.chunker import Chunker
+from src.document_parsing import Chunker
 
-from src.preprocesing.document_parsing.document_parser import DocumentParser
+from src.document_parsing.document_parser import DocumentParser
+from src.structured_output.terms import Terms
 from src.vectordb.vector import Vector
 from src.vectordb.vector_storage import VectorStorage
 
 
-def get_chunks(model: STEmbedding, storage: VectorStorage):
+def get_chunks(model: EmbeddingModel, storage: VectorStorage):
     files = os.listdir("data")
 
     # Read and parse documents first
     documents = []
 
     # Set up tqdm with conditional verbosity
-    progress_bar = tqdm(enumerate(files, 1), desc="Reading Files", unit="file", disable=not self.verbose)
+    progress_bar = tqdm(enumerate(files, 1), desc="Reading Files", unit="file")
 
     for i, file in progress_bar:
-        file_path = os.path.join(self.path, file)
+        file_path = os.path.join("data", file)
 
         with open(file_path, "r") as f:
             data = f.read()
@@ -85,6 +85,7 @@ def get_chunks(model: STEmbedding, storage: VectorStorage):
 
 if __name__ == "__main__":
 
+
     # Load the document parser
 
     toml_file = "config.toml"
@@ -119,11 +120,11 @@ if __name__ == "__main__":
 
     while True:
 
-        querry = input("Enter the query: ")
+        query = input("Enter the query: ")
 
-        querry = get_detailed_instruct("Given provided query, retrieve documents that best answer asked question.", querry)
+        query = get_detailed_instruct("Given provided query, retrieve documents that best answer asked question.", query)
 
-        query_vector = model.embed([querry])[0].tolist()
+        query_vector = model.embed([query])[0].tolist()
 
         results = table.query(query_vector, n=5, distance="cosine")
 
@@ -132,10 +133,10 @@ if __name__ == "__main__":
             context += result.content + "\n\n"
 
 
-        print(f"Context: {context}")
+        # print(f"Context: {context}")
 
         context += "Question:\n\n"
 
-        llmodel_response = llmodel.generate_response(prompt=querry, image_urls = ["https://www.spaceplacestorage.com/wp-content/uploads/2016/01/google-small-icon-300x300.png"])
+        llmodel_response = llmodel.generate_response(prompt=context + query)
 
         print(f"LLM Response: {llmodel_response}")

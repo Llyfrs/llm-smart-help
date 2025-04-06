@@ -1,5 +1,5 @@
 import json
-from typing import LiteralString, Literal
+from typing import Literal
 
 import psycopg2
 from psycopg2.extras import execute_batch
@@ -164,7 +164,7 @@ class VectorStorage:
                 pbar.update(len(batch))
                 self.connection.commit()
 
-    def query(self, vector: list[float], n: int = 10, distance: Literal["l2", "inner_product", "cosine", "l1", "hamming", "jaccard"] = "inner_product")  -> list[Vector]:
+    def query(self, vector: list[float], n: int = 10, distance: Literal["l2", "inner_product", "cosine", "l1", "hamming", "jaccard"] = "cosine")  -> list[Vector]:
 
         dic = {
             "l2": "<->",

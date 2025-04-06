@@ -1,10 +1,7 @@
 from dataclasses import field, dataclass
 from typing import Dict, List
 
-from markdown_it import MarkdownIt
-from markdown_it.tree import SyntaxTreeNode
-
-from src.preprocesing.document_parsing.section import Section
+from .section import Section
 
 
 @dataclass

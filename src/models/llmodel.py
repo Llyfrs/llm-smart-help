@@ -1,12 +1,12 @@
 
-from typing import Optional
+from typing import Optional, Union, Type
 from openai import OpenAI
 from openai.types import CompletionUsage
+from pydantic import BaseModel
 
-from src.models.model import Model
 
 
-class LLModel(Model):
+class LLModel:
 
     def __init__(self, model_name: str, api_key: str, endpoint: str, system_prompt: str = None):
         """
@@ -27,11 +27,12 @@ class LLModel(Model):
             api_key=api_key,
         )
 
-    def generate_response(self, prompt: str, image_urls: Optional[list[str]] = None) -> str:
+    def generate_response(self, prompt: str, image_urls: Optional[list[str]] = None, structure : Type[BaseModel]  = None) -> Union[str, BaseModel]:
         """
         Generate a response from the model.
         :param image_urls: List of image URLs to be included in the prompt, the model needs to support vision.
         :param prompt: The input prompt for the model.
+        :param structure: Forces the model to respond in specific structure, if provided. Otherwise the model will return string.
         :return: Model response.
         """
 
@@ -45,24 +46,50 @@ class LLModel(Model):
                     }
                 })
 
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
+        settings = {
+            "model": self.model_name,
+            "messages": [
                 {"role": "system", "content": self.system_prompt},
                 {
                     "role": "user",
                     "content": [
-                    {"type": "text", "text": prompt}
-                    ] + images  # Merge text + images into one list
+                                   {"type": "text", "text": prompt}
+                               ] + images  # Merge text + images into one list
                 }
             ],
+        }
+
+
+
+        if structure is not None:
+            schema = structure.model_json_schema()
+            schema["additionalProperties"] = False
+
+            settings["response_format"] = {
+                "type" : "json_schema",
+                "json_schema" : {
+                    "name": structure.__name__,
+                    "strict": True,
+                    "schema": schema
+                }
+            }
+
+
+        response = self.client.chat.completions.create(
+            **settings,
         )
+
 
         self.usage = response.usage
 
-        print(self.usage)
+        #print(self.usage)
 
-        return response.choices[0].message.content
+        print(response)
+
+        if structure is not None:
+            return structure.model_validate_json(response.choices[0].message.content)
+        else:
+            return response.choices[0].message.content
 
     def get_last_usage(self) -> Optional[CompletionUsage]:
         """
