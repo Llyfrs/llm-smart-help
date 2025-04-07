@@ -15,7 +15,6 @@ from src.models.llmodel import LLModel
 from src.document_parsing import Chunker
 
 from src.document_parsing.document_parser import DocumentParser
-from src.structured_output.terms import Terms
 from src.vectordb.vector import Vector
 from src.vectordb.vector_storage import VectorStorage
 
