@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 
 from src.document_parsing import Chunk
@@ -9,13 +10,14 @@ class Vector:
     """
     A class to represent a vector in a vector storage.
     """
+
     vector: List[float]
     file_name: str
     file_position: int
     content: str
     metadata: dict
     id: Optional[int] = None
-    updated_at: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
     @classmethod
     def from_chunk(cls, chunk: Chunk, vector: List[float]) -> "Vector":
@@ -32,6 +34,5 @@ class Vector:
             content=chunk.content,
             metadata=chunk.metadata,
             id=None,
-            updated_at=None
+            updated_at=None,
         )
-

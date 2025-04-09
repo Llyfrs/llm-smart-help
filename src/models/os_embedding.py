@@ -6,13 +6,21 @@ import tiktoken
 from src.models.embedding_model import EmbeddingModel
 from openai import OpenAI
 
-class OAEmbedding(EmbeddingModel):
 
+class OAEmbedding(EmbeddingModel):
     """
     This class is a wrapper for the OpenAI API to generate embeddings.
     """
 
-    def __init__(self, model_name: str, api_key: str, dimension: int, endpoint: str = "https://api.openai.com/v1", *args, **kwargs):
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str,
+        dimension: int,
+        endpoint: str = "https://api.openai.com/v1",
+        *args,
+        **kwargs,
+    ):
         """
         Initialize the OAEmbedding model.
         :param model_name: Name of the embedding model.
@@ -20,13 +28,7 @@ class OAEmbedding(EmbeddingModel):
         self.model_name = model_name
         self.l_dimension = dimension
 
-        self.client = OpenAI(
-            base_url=endpoint,
-            api_key=api_key,
-            *args,
-            **kwargs
-        )
-
+        self.client = OpenAI(base_url=endpoint, api_key=api_key, *args, **kwargs)
 
     def embed(self, data: List[str]) -> List[np.array]:
         """
@@ -36,13 +38,9 @@ class OAEmbedding(EmbeddingModel):
         :return:
         """
 
-        response = self.client.embeddings.create(
-            model=self.model_name,
-            input=data
-        )
+        response = self.client.embeddings.create(model=self.model_name, input=data)
 
         return [np.array(d.embedding) for d in response.data]
-
 
     def tokenize(self, data: str) -> list[int]:
         """

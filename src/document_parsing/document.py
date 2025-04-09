@@ -1,14 +1,20 @@
 from dataclasses import field, dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+from black import datetime
 
 from .section import Section
 
-
 @dataclass
 class Document:
+    """
+    A class to represent a markdown document. Contains tree-like structure of sections, paragraphs, tables, images, and bullet lists.
+    """
+
     file_name: str
     metadata: Dict[str, str] = field(default_factory=dict)
     sections: List[Section] = field(default_factory=list)
+    updated_at: Optional[datetime] = None
 
     def __str__(self) -> str:
         document = ""
@@ -26,6 +32,12 @@ class Document:
         return document
 
     def get_tree_str(self) -> str:
+        """
+        Returns a string representation of the document's structure as a tree.
+        Mostly for debugging purposes.
+        :return: str
+        """
+
         def _build_tree(sections, indent=0):
             tree = ""
             for sec in sections:
@@ -37,4 +49,9 @@ class Document:
         return _build_tree(self.sections)
 
     def print_tree(self):
+        """
+        Prints the document's structure as a tree.
+        Mostly for debugging purposes.
+        :return:
+        """
         print(self.get_tree_str())

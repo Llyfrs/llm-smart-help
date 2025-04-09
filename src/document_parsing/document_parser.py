@@ -1,7 +1,7 @@
 import re
 from typing import List, Union, Dict
 
-
+from black import datetime
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 
@@ -33,8 +33,9 @@ class DocumentParser:
 
     """
 
-    def __init__(self, file_name: str):
+    def __init__(self, file_name: str, updated_at: datetime = None):
         self.file_name = file_name
+        self.updated_at = updated_at
 
     def parse(self, document: str) -> Document:
         """
@@ -72,7 +73,12 @@ class DocumentParser:
 
         # Parse content recursively from the syntax tree tokens
         content = self._parse_nodes(root.children)
-        return Document(file_name=self.file_name, metadata=metadata, sections=content)
+        return Document(
+            file_name=self.file_name,
+            metadata=metadata,
+            sections=content,
+            updated_at=self.updated_at,
+        )
 
     def _parse_nodes(
         self, nodes: List[SyntaxTreeNode]

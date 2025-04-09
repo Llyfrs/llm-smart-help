@@ -96,10 +96,7 @@ class VectorStorage:
         self.connection.commit()
         return True
 
-    def insert(
-        self,
-        vector: Vector
-    ):
+    def insert(self, vector: Vector):
         """
         Insert a new vector into the database.
         :param file_name: The name of the file the vector belongs to.
@@ -115,16 +112,23 @@ class VectorStorage:
                 """
 
         self.cursor.execute(
-            query, (vector, vector.file_name, vector.file_position, vector.content, json.dumps(vector.metadata))
+            query,
+            (
+                vector,
+                vector.file_name,
+                vector.file_position,
+                vector.content,
+                json.dumps(vector.metadata),
+            ),
         )
         self.connection.commit()
 
     def batch_insert(
-            self,
-            entries: list[Vector],
-            batch_size: int = 1000,
-            page_size: int = 500,
-            verbose: bool = False
+        self,
+        entries: list[Vector],
+        batch_size: int = 1000,
+        page_size: int = 500,
+        verbose: bool = False,
     ):
         """
         Efficient batch insert using psycopg2's execute_batch
@@ -151,20 +155,29 @@ class VectorStorage:
                 entry.file_name,
                 entry.file_position,
                 entry.content,
-                json.dumps(entry.metadata)
+                json.dumps(entry.metadata),
             )
             for entry in entries
         ]
 
-    # Use execute_batch with progress tracking
-        with tqdm(total=len(data), desc="Inserting Batches", unit="batch", disable=not verbose) as pbar:
+        # Use execute_batch with progress tracking
+        with tqdm(
+            total=len(data), desc="Inserting Batches", unit="batch", disable=not verbose
+        ) as pbar:
             for i in range(0, len(data), batch_size):
-                batch = data[i:i + batch_size]
+                batch = data[i : i + batch_size]
                 execute_batch(self.cursor, query, batch, page_size=page_size)
                 pbar.update(len(batch))
                 self.connection.commit()
 
-    def query(self, vector: list[float], n: int = 10, distance: Literal["l2", "inner_product", "cosine", "l1", "hamming", "jaccard"] = "cosine")  -> list[Vector]:
+    def query(
+        self,
+        vector: list[float],
+        n: int = 10,
+        distance: Literal[
+            "l2", "inner_product", "cosine", "l1", "hamming", "jaccard"
+        ] = "cosine",
+    ) -> list[Vector]:
 
         dic = {
             "l2": "<->",
@@ -172,7 +185,7 @@ class VectorStorage:
             "cosine": "<=>",
             "l1": "<+>",
             "hamming": "<~>",
-            "jaccard": "<%>"
+            "jaccard": "<%>",
         }
 
         symbol = dic[distance]
@@ -187,10 +200,7 @@ class VectorStorage:
         self.cursor.execute(query, (vector, n))
         results = self.cursor.fetchall()
 
-        vectors = [
-            self._parse(result)
-            for result in results
-        ]
+        vectors = [self._parse(result) for result in results]
 
         return vectors
 
@@ -204,13 +214,31 @@ class VectorStorage:
         self.cursor.execute(query, (file_name,))
         results = self.cursor.fetchall()
 
-        vectors = [
-            self._parse(result)
-            for result in results
-        ]
+        vectors = [self._parse(result) for result in results]
 
         return vectors
 
+    def delete_file(self, file_name: str) -> bool:
+        query = f"""
+                DELETE FROM {self.table_name}
+                WHERE file_name = %s
+                """
+
+        self.cursor.execute(query, (file_name,))
+        self.connection.commit()
+
+        return True
+
+
+    def clear_table(self):
+        """
+        Clear all data from the table.
+        :return:
+        """
+        query = f"DELETE FROM {self.table_name};"
+        self.cursor.execute(query)
+        self.connection.commit()
+        return True
 
     @staticmethod
     def _parse(result) -> Vector:

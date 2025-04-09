@@ -23,7 +23,6 @@ class EmbeddingModel(ABC):
         """Return metadata about the embedding model."""
         pass
 
-
     @property
     @abstractmethod
     def dimension(self) -> int:

@@ -102,11 +102,12 @@ def _fix_signs(soup):
         if "-" in li.text or "+" in li.text:
             # Create a new <span> element
             new = soup.new_tag("li")
-            new.string = '\'' + li.text + '\''
+            new.string = "'" + li.text + "'"
             # Replace li with span
             li.replace_with(new)
 
     return soup
+
 
 def __remove_patch_history(soup):
     """
@@ -125,6 +126,7 @@ def __remove_patch_history(soup):
         patch_history.decompose()
 
     return soup
+
 
 def process_wiki_pages(
     raw_folder_path: str, save_folder_path: str, meta_data: Dict[str, str] = None
@@ -181,12 +183,9 @@ def process_wiki_pages(
                     )  # Insert it before the <tr> (will work as table caption)
                     tr.decompose()  # Remove the original <tr>
 
-
             ## Remove new-infobox class
             for div in soup.find_all("div", class_="new-infobox"):
                 div.decompose()
-
-
 
             soup = _fix_markdown_tables(soup)
             soup = _fix_signs(soup)
