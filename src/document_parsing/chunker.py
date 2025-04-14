@@ -62,11 +62,12 @@ class Chunker:
                 # Get the next item
                 item = queue.pop(0)
                 if isinstance(item, Document):
-                    queue.extend(item.sections)
+                    queue.insert(0,item.sections)
                 elif isinstance(item, Section):
-                    queue.extend(item.content)
+                    queue.insert(0,item.content)
                 else:
-                    processed.append(item)
+                    processed.insert(0, item)
+
 
             queue = processed
 
@@ -107,8 +108,7 @@ class Chunker:
                         continue
 
                     half = round(len(section.sections) / 2)
-                    queue.extend(
-                        [
+                    queue[:0] = [
                             Document(
                                 file_name=document.file_name,
                                 sections=section.sections[:half],
@@ -118,12 +118,12 @@ class Chunker:
                                 sections=section.sections[half:],
                             ),
                         ]
-                    )
+
                 ## If we are using balanced strategy we split the document in it's sections,
                 # this will potentially result in smaller chunks that max_tokens but, makes chunks more structured
                 # and still keeps them bigger than min_tokens
                 else:
-                    queue.extend(section.sections)
+                    queue[:0] = section.sections
 
             elif isinstance(section, Section):
                 """
@@ -139,8 +139,7 @@ class Chunker:
                         continue
 
                     half = round(len(section.content) / 2)
-                    queue.extend(
-                        [
+                    queue[:0] = [
                             Section(
                                 title=section.title,
                                 level=section.level,
@@ -152,9 +151,8 @@ class Chunker:
                                 content=section.content[half:],
                             ),
                         ]
-                    )
                 else:
-                    queue.extend(section.content)
+                    queue[:0] = section.content
 
             elif isinstance(section, Table):
 
@@ -169,8 +167,7 @@ class Chunker:
 
                 # Split table rows into two halves
                 rows = round(len(section.rows) / 2)
-                queue.extend(
-                    [
+                queue[:0] =  [
                         Table(
                             headers=section.headers,
                             rows=section.rows[:rows],
@@ -182,7 +179,6 @@ class Chunker:
                             caption=section.caption,
                         ),
                     ]
-                )
 
             elif isinstance(section, BulletList):
 
@@ -195,12 +191,11 @@ class Chunker:
 
                 # Split bullet list into two halves
                 items = round(len(section.items) / 2)
-                queue.extend(
-                    [
+                queue[:0] = [
                         BulletList(items=section.items[:items]),
                         BulletList(items=section.items[items:]),
                     ]
-                )
+
             elif isinstance(section, Paragraph):
 
                 """
@@ -212,11 +207,10 @@ class Chunker:
                 content = section.content
 
                 half = round(len(content) / 2)
-                queue.extend(
-                    [
+                queue[:0] = [
                         Paragraph(content=content[:half]),
                         Paragraph(content=content[half:]),
                     ]
-                )
+
 
         return chunks

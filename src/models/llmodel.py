@@ -77,10 +77,6 @@ class LLModel:
 
         self.usage = response.usage
 
-        # print(self.usage)
-
-        print(response)
-
         if structure is not None:
             return structure.model_validate_json(response.choices[0].message.content)
         else:

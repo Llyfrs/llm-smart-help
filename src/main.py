@@ -5,9 +5,12 @@ from typing import Dict, Any, Type
 
 from pydantic import BaseModel
 
+from src.document_parsing import Chunker
 from src.models import OAEmbedding, EmbeddingModel
 from src.models.llmodel import LLModel
 from src.models.st_embedding import STEmbedding
+from src.routines.cli_routine import cli_routine
+from src.routines.embedding_routine import embedding_routine
 from src.vectordb.vector_storage import VectorStorage
 
 import argparse
@@ -97,9 +100,9 @@ def get_required_config(config, key, error_msg=None):
 def load_llmodels(config : Dict[str, Dict[str, str]]) -> Dict[str, LLModel]:
     models = dict()
     for model in config["model"]:
-        model_name = config["model"][model]["MODEL_NAME"]
-        endpoint = config["model"][model]["END_POINT"]
-        api_key = config["model"][model]["API_KEY"]
+        model_name = config["model"][model]["model_name"]
+        endpoint = config["model"][model]["base_url"]
+        api_key = config["model"][model]["api_key"]
         ll_model = LLModel(
             model_name=model_name,
             endpoint=endpoint,
@@ -110,45 +113,65 @@ def load_llmodels(config : Dict[str, Dict[str, str]]) -> Dict[str, LLModel]:
 
     return models
 
-def load_embedding_model(config : Dict[str, Any], model_name: str) -> Type[EmbeddingModel]:
+def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
+    embed_model_names = list(config["embedding_model"].keys())
 
-    model = None
+    print("What embedding model do you want to use?:")
+    for i, name in enumerate(embed_model_names):
+        print(f"\t{i}) {name}")
 
-    for m in config["embed_model"]:
+    choice = int(input("Enter the number of your choice: "))
+    if choice < 0 or choice >= len(embed_model_names):
+        print("Invalid choice. Exiting.")
+        exit(1)
 
-        if m != model_name:
-            continue
+    selected_model_key = embed_model_names[choice]
+    print("Note: This selection can be skipped by setting the embedding_model under [default] in the config file")
 
-        name = config[m]["MODEL_NAME"] ## Will be needed we might as well crash
-        api_key = config[m].get("API_KEY", None)
-        endpoint = config[m].get("END_POINT", None)
-        dimension = config[m].get("DIMENSION", None)
+    model_config = config["embedding_model"][selected_model_key]
+    name = model_config["model_name"]
+    api_key = model_config.get("api_key")
+    endpoint = model_config.get("base_url")
+    dimension = model_config.get("dimension")
+    prompt = model_config.get("prompt")
 
-        if api_key is None or endpoint is None or dimension is None:
-            model = STEmbedding(name, cache_folder="cache_folder")
-        else:
-            model = OAEmbedding(
-                model_name=name,
-                api_key=api_key,
-                endpoint=endpoint,
-                dimension=dimension
-            )
+    if api_key is None or endpoint is None or dimension is None:
+        print(f'Loading local embedding model "{name}", this might take a while')
+        model = STEmbedding(name, cache_folder="cache_folder", prompt=prompt)
+        print("Model loaded successfully")
+    else:
+        model = OAEmbedding(
+            model_name=name,
+            api_key=api_key,
+            endpoint=endpoint,
+            dimension=dimension,
+            prompt=prompt,
+        )
 
     return model
 
 
 def main():
+
     """
     Main function for the project.
     :return:
     """
 
-
     args = argparse_args()
 
     # Load the config file
     config = load_config(args.config)
+
     models = load_llmodels(config)
+
+    embedding_model = load_embedding_model(config)
+
+    storage = VectorStorage(
+        name="local",
+        dimension=embedding_model.get_dimension(),
+        connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
+    )
 
     # Based on the command, pull in defaults from config if CLI args aren't provided
     if args.command in ["run-discord-module", "run-server"]:
@@ -156,16 +179,33 @@ def main():
         address = get_config_or_arg(args.address, config, "address")
         print(f"Using port: {port}, address: {address}")
 
-    # Example: Handling embedding commands
+    # Handling embedding commands
     if args.command == "embedding":
         data_path = get_config_or_arg(args.path, config, "data_path")
 
         ## args should make sure that action is chosen
         action = args.action
 
+        chunker = Chunker(
+            chunk_size=embedding_model.get_dimension(),
+            chunk_strategy="balanced",
+            tokenizer=embedding_model.tokenize,
+        )
+
+        embedding_routine(data_path=data_path,
+                          chunker=chunker,
+                          embedding_model=embedding_model,
+                          vector_storage=storage,
+                          mode=action)
+
 
     if args.command == "run-cli":
         print("Running in CLI mode")
+        cli_routine(
+            model=models["gemma_3_4B"],
+            embedding_model=embedding_model,
+            vector_storage=storage,
+        )
 
     if args.command == "run-discord-module":
         print("Running Discord module")
@@ -173,63 +213,7 @@ def main():
     if args.command == "run-server":
         print("Running server")
 
-    connection_string = get_required_config(config, "POSTGRESQL_CONNECTION_STRING")
 
-    exit(0)
-
-    model = STEmbedding("intfloat/multilingual-e5-large-instruct")
-
-    print("Embedding model loaded successfully!")
-
-    table = VectorStorage(
-        name="MiniLM", dimension=model.dimension, connection_string=connection_string
-    )
-
-    result = table.get_file(
-        "Dual Bushmasters -  Torncity WIKI - The official help and support guide.md"
-    )
-    print(f"Result: {result}")
-
-    exit(0)
-
-    llmodel = LLModel(
-        model_name=config["model"][list(config["model"].keys())[0]]["MODEL_NAME"],
-        endpoint=config["model"][list(config["model"].keys())[0]]["ENDPOINT_URL"],
-        api_key=config["model"][list(config["model"].keys())[0]]["API_KEY"],
-        system_prompt="Based on provided context, answer the question.",
-    )
-
-    print("LLM model loaded successfully!")
-
-    # get_chunks(model, table)
-
-    def get_detailed_instruct(task_description: str, query: str) -> str:
-        return f"Instruct: {task_description}\nQuery: {query}"
-
-    while True:
-
-        query = input("Enter the query: ")
-
-        query = get_detailed_instruct(
-            "Given provided query, retrieve documents that best answer asked question.",
-            query,
-        )
-
-        query_vector = model.embed([query])[0].tolist()
-
-        results = table.query(query_vector, n=5, distance="cosine")
-
-        context = "Context:\n\n"
-        for result in results:
-            context += result.content + "\n\n"
-
-        # print(f"Context: {context}")
-
-        context += "Question:\n\n"
-
-        llmodel_response = llmodel.generate_response(prompt=context + query)
-
-        print(f"LLM Response: {llmodel_response}")
 
 
 if __name__ == "__main__":

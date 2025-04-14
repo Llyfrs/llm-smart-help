@@ -18,6 +18,7 @@ class OAEmbedding(EmbeddingModel):
         api_key: str,
         dimension: int,
         endpoint: str = "https://api.openai.com/v1",
+        prompt: str = None,
         *args,
         **kwargs,
     ):
@@ -25,18 +26,25 @@ class OAEmbedding(EmbeddingModel):
         Initialize the OAEmbedding model.
         :param model_name: Name of the embedding model.
         """
+
+        super().__init__(prompt=prompt)
+
         self.model_name = model_name
         self.l_dimension = dimension
 
         self.client = OpenAI(base_url=endpoint, api_key=api_key, *args, **kwargs)
 
-    def embed(self, data: List[str]) -> List[np.array]:
+    def embed(self, data: List[str], instruction: str = None) -> List[np.array]:
         """
 
         Embed a list of strings into a list of vectors.
         :param data:
+        :param use_prompt:
         :return:
         """
+
+        if instruction:
+            data = [self.apply_prompt(instruction, d) for d in data]
 
         response = self.client.embeddings.create(model=self.model_name, input=data)
 
@@ -64,8 +72,8 @@ class OAEmbedding(EmbeddingModel):
         """
         return {}
 
-    @property
-    def dimension(self) -> int:
+
+    def get_dimension(self) -> int:
         """
         Return the dimension of the embedding.
         :return:

@@ -1,6 +1,6 @@
 import os
-from datetime import datetime
-from typing import Literal, Any, Generator
+from datetime import datetime, timezone
+from typing import Literal, Any, Generator, Type
 from tqdm import tqdm
 
 from src.document_parsing import Document, Chunker
@@ -40,25 +40,32 @@ def embedding_routine(
     pbar = tqdm(total=number_of_files, desc="Processing files", unit="file")
 
     for document in _document_generator(data_path):
+
+        if mode == "update":
+            file = vector_storage.get_file(document.file_name)
+
+
+            ## Should correspond to database time zone
+            ## This will probably break anyway if the user jumps timezones or something
+            if len(file) != 0:
+                file_updated_at = file[0].updated_at.replace(tzinfo=timezone.utc)
+                document_updated_at = document.updated_at.replace(tzinfo=timezone.utc)
+                if file_updated_at < document_updated_at:
+                    vector_storage.delete_file(document.file_name)
+                else:
+                    pbar.update(1)
+                    continue
+
+
         chunks = chunker.chunk(document)
         contents = [chunk.content for chunk in chunks]
         embeddings = embedding_model.embed(contents)
         vectors = [
-            Vector.from_chunk(chunk, embedding)
+            Vector.from_chunk(chunk, embedding.tolist())
             for chunk, embedding in zip(chunks, embeddings)
         ]
 
-        if mode == "create":
-            vector_storage.batch_insert(vectors)
-
-        elif mode == "update":
-            file = vector_storage.get_file(document.file_name)
-            if len(file) == 0:
-                vector_storage.batch_insert(vectors)
-
-            elif file[0].updated_at < document.updated_at:
-                vector_storage.delete_file(document.file_name)
-                vector_storage.batch_insert(vectors)
+        vector_storage.batch_insert(vectors)
 
         pbar.update(1)
 

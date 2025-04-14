@@ -86,6 +86,17 @@ class VectorStorage:
         self.cursor.execute(query)
         self.connection.commit()
 
+
+    def list_tables(self) -> list[str]:
+        """
+        List all tables in the database.
+        :return: List of table names.
+        """
+        query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public';"
+        self.cursor.execute(query)
+        tables = self.cursor.fetchall()
+        return [table[0] for table in tables]
+
     def delete_table(self) -> bool:
         """
         Drop the table from the database. Removing all data.

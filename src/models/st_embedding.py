@@ -1,5 +1,7 @@
 from typing import Dict, Any, List
 
+import numpy as np
+
 from src.models.embedding_model import EmbeddingModel
 from sentence_transformers import SentenceTransformer
 
@@ -9,19 +11,23 @@ class STEmbedding(EmbeddingModel):
     Wrapper class for the SentenceTransformer library.
     """
 
-    def __init__(self, model_name, *args, **kwargs):
+    def __init__(self, model_name, prompt:str = None, *args, **kwargs):
         self.model_name = model_name
         self.model = SentenceTransformer(model_name, *args, **kwargs)
-        super().__init__()
+        super().__init__(prompt=prompt)
 
-    def embed(self, data):
+    def embed(self, data, instruction=None):
+
+        if instruction:
+            data = [self.apply_prompt(instruction, d) for d in data]
+
         return self.model.encode(data, normalize_embeddings=True)
 
     def tokenize(self, data: str) -> List[int]:
         return self.model.tokenizer.encode(data, add_special_tokens=True)
 
-    @property
-    def dimension(self):
+
+    def get_dimension(self):
         return self.model.get_sentence_embedding_dimension()
 
     def metadata(self) -> Dict[str, Any]:
