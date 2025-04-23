@@ -16,6 +16,18 @@ class STEmbedding(EmbeddingModel):
         self.model = SentenceTransformer(model_name, *args, **kwargs)
         super().__init__(prompt=prompt)
 
+
+    def __copy__(self):
+        # Create new wrapper without re-running __init__
+        cls = self.__class__
+        new = cls.__new__(cls)
+        # Copy base attributes
+        EmbeddingModel.__init__(new, prompt=self.prompt)
+        # Share the same SentenceTransformer instance
+        new.model_name = self.model_name
+        new.model = self.model
+        return new
+
     def embed(self, data, instruction=None):
 
         if instruction:

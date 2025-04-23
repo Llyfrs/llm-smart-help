@@ -1,32 +1,12 @@
 from typing import Type
 
 from src.models import LLModel, EmbeddingModel
+from src.models.agents import Agents
+from src.models.structured_output.questions import Questions
 from src.models.structured_output.terms import Terms
 from src.vectordb.vector_storage import VectorStorage
 
-MAIN_MODEL_PROMPT = """
-You are a helpful assistant. Answer the user's questions based on the provided context.
-Keep answers short and formated in way that is easy to read in console application. Don't use markdown."
-""".strip()
 
-
-TERMS_EXTRACTION_PROMPT = """
-
-Extract terms or entities directly from the text by following these guidelines: 
-Use the exact wording from the original text, making only necessary corrections to obvious spelling mistakes. 
-By default, represent each term as a single word; however, if the term clearly constitutes a multi-word entity, such as a proper noun (e.g., "New York"), retain it as such. 
-Additionally, ensure that words that are clearly descrititve adjectives (e.g., "red", "big") are included with term they are describing as one. (e.g., "red apple" should be represented as a single term "red apple").
-Finally, normalize each term to its base or root form (for example, converting "running" to "run") and output the resulting list of extracted terms.
-
-""".strip()
-
-TERM_RESEARCHER_PROMPT = """
-
-You are a unpaid intern at a company and your job is to take raw data and extract definition of a single term from it.
-You output should be 2 to 3 sentence conveying the meaning of the term. Grammar, flowery sentences and punctuation are not important, but the meaning should be clear.
-These summaries will be latter used by other interns to add context to existing texts using these terms.
-
-""".strip()
 
 def colored_text(text: str, color: str) -> str:
     """
@@ -48,53 +28,83 @@ def colored_text(text: str, color: str) -> str:
     return f"{colors.get(color, colors['reset'])}{text}{colors['reset']}"
 
 
+def run_qa_pipeline(
+    user_query: str,
+    agents: Agents,
+    embedding_model: EmbeddingModel,
+    vector_storage: VectorStorage,
+) -> tuple[str, str]:
+    """
+    🚀 Full QA pipeline from term extraction → final answer.
+    Returns (final_context, final_answer).
+    """
+    EMBED_PROMPT = "Give user query, retrieve relevant passages that best answer asked question."
+
+    # 🔍 1) Term extraction
+    terms_struct: Terms = agents.term_extraction_model.generate_response(
+        prompt=user_query, structure=Terms
+    )
+
+    # 📝 2) Term research
+    term_explanations: dict[str, str] = {}
+    for term in terms_struct.terms:
+        vec = embedding_model.embed([f"What is {term}?"], instruction=EMBED_PROMPT)[0].tolist()
+        docs = vector_storage.query(vec, n=3)
+        context = "".join(c.content for c in docs)
+        explanation = agents.term_researcher_model.generate_response(
+            prompt=f"Explain the term {term} based on:\n\n{context}"
+        ).strip()
+        term_explanations[term] = explanation
+
+    # 🔗 Build context for question generation
+    terms_block = "\n".join(f"{t}: {e}" for t, e in term_explanations.items())
+    qgen_prompt = f"**Context**\n{terms_block}\n\nUser Query: {user_query}"
+
+    # ❓ 3) Question generation
+    questions_struct: Questions = agents.query_generator_model.generate_response(
+        prompt=qgen_prompt, structure=Questions
+    )
+
+    # 📚 4) Question research
+    question_answers: dict[str, str] = {}
+    for q in questions_struct.questions:
+        vec = embedding_model.embed([q], instruction=EMBED_PROMPT)[0].tolist()
+        docs = vector_storage.query(vec, n=3)
+        ctx = "\n".join(d.content for d in docs)
+        ans = agents.query_researcher_model.generate_response(
+            prompt=f"**Context:**\n{ctx}\n\nResearched Question: {q}"
+        ).strip()
+        question_answers[q] = ans
+
+    # 🏁 5) Final answer
+    qa_block = "\n\n".join(f"Question: {q}\nAnswer: {a}" for q, a in question_answers.items())
+    final_context = f"**Context**\n{qa_block}\n\nUser Query: {user_query}"
+    final_answer = agents.main_model.generate_response(prompt=final_context).strip()
+
+    final_context = f"{terms_block}\n\n" + final_context
+    return final_context, final_answer
+
+
+# Updated cli_routine
 def cli_routine(
-    model: LLModel,
+    agents: Agents,
     embedding_model: EmbeddingModel,
     vector_storage: VectorStorage,
 ):
-    """
-    Chat with your data!
-    :param model:
-    :param embedding_model:
-    :param vector_storage:
-    :return:
-    """
-
-
     while True:
         user_input = input("You: ")
         if user_input.lower() == "exit":
             break
 
-        prompt = "Give user query, retrieve relevant passages that best answer asked question."
+        final_ctx, answer = run_qa_pipeline(
+            user_query=user_input,
+            agents=agents,
+            embedding_model=embedding_model,
+            vector_storage=vector_storage,
+        )
 
-        model.system_prompt = TERMS_EXTRACTION_PROMPT
-        response = model.generate_response(prompt=user_input, structure=Terms)
-
-        print(colored_text(f"Terms: {response}", "green"))
-
-        model.system_prompt = TERM_RESEARCHER_PROMPT
-
-        for term in response.terms:
-            print(colored_text(f"Term: {term}", "yellow"))
-            context = vector_storage.query(embedding_model.embed([f"Explain the term {term}"], instruction=prompt)[0].tolist(), n=1)
-            print(colored_text(f"Context: {context[0].content}", "blue"))
-            response = model.generate_response(prompt=context[0].content)
-            print(colored_text(f"Definition: {response}", "green"))
+        print(colored_text(f"Final Context: {final_ctx}", "blue"))
+        print(colored_text(f"Final Answer: {answer}", "green"))
+        break
 
 
-
-
-        # relevant_docs = vector_storage.query(embedding_model.embed([user_input], instruction=prompt)[0].tolist(), n=5)
-
-        # context = "\n\n".join(doc.content for doc in relevant_docs)
-
-        # print(colored_text(f"{context}", "red"))
-
-        # context += "\n\nUser Question:" + user_input
-
-        # Generate a response using the model
-
-
-        #print(f"{colored_text(f'Assistant: {response}', 'green')}")

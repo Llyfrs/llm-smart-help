@@ -1,20 +1,26 @@
 """
 This is the main file for the project.
 """
+from dataclasses import dataclass
 from typing import Dict, Any, Type
 
-from pydantic import BaseModel
+
 
 from src.document_parsing import Chunker
 from src.models import OAEmbedding, EmbeddingModel
+from src.models.agents import Agents
 from src.models.llmodel import LLModel
 from src.models.st_embedding import STEmbedding
 from src.routines.cli_routine import cli_routine
 from src.routines.embedding_routine import embedding_routine
+from src.vectordb.term_storage import TermStorage
 from src.vectordb.vector_storage import VectorStorage
 
 import argparse
 import toml  # assuming you're using toml to load your config
+
+
+
 
 def argparse_args():
 
@@ -108,27 +114,37 @@ def load_llmodels(config : Dict[str, Dict[str, str]]) -> Dict[str, LLModel]:
             endpoint=endpoint,
             api_key=api_key,
         )
-        print(f"Found llm model \"{model}\" in config file")
+        # print(f"Found llm model \"{model}\" in config file")
         models[model] = ll_model
 
     return models
 
 def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
+
+    """
+    Looks if default embedding model is selected and if not asks user what embedding model to use.
+    :param config:
+    :return:
+    """
+
     embed_model_names = list(config["embedding_model"].keys())
 
-    print("What embedding model do you want to use?:")
-    for i, name in enumerate(embed_model_names):
-        print(f"\t{i}) {name}")
+    model_name = config.get("default", {}).get("embedding_model", None)
 
-    choice = int(input("Enter the number of your choice: "))
-    if choice < 0 or choice >= len(embed_model_names):
-        print("Invalid choice. Exiting.")
-        exit(1)
+    if model_name is None :
+        print("What embedding model do you want to use?:")
+        for i, name in enumerate(embed_model_names):
+            print(f"\t{i}) {name}")
 
-    selected_model_key = embed_model_names[choice]
-    print("Note: This selection can be skipped by setting the embedding_model under [default] in the config file")
+        choice = int(input("Enter the number of your choice: "))
+        if choice < 0 or choice >= len(embed_model_names):
+            print("Invalid choice. Exiting.")
+            exit(1)
 
-    model_config = config["embedding_model"][selected_model_key]
+        model_name = embed_model_names[choice]
+        print("Note: This selection can be skipped by setting the embedding_model under [default] in the config file")
+
+    model_config = config["embedding_model"][model_name]
     name = model_config["model_name"]
     api_key = model_config.get("api_key")
     endpoint = model_config.get("base_url")
@@ -151,6 +167,64 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
     return model
 
 
+def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
+    """
+    Select models for each agent role, checking config defaults first.
+
+    :param models: Dictionary of available LLModels
+    :param config: Configuration dictionary that might contain defaults
+    :return: Agents dataclass with selected models
+    """
+    model_names = list(models.keys())
+    agent_roles = {
+        "main_model": "Model that will use all provided information and actually answer the question to the user. "
+                      "Quality of this model will impact the quality of response and preferable capable models should be chosen. ",
+        "term_extraction_model": "Extracts key terms from text it needs good parsing ability and support structured outputs. Otherwise can be very small.",
+        "term_researcher_model": "Creates concise term definitions (needs good summarization + structured outputs)",
+        "query_generator_model": "Generates search queries (needs good instruction following but doesn't need to be large)",
+        "query_researcher_model": "Processes search results (needs strong comprehension)",
+        "judge_model": "Evaluates quality of results (best for reasoning models + needs to support structured outputs)"
+    }
+
+    selected_models = {}
+    default_section = config.get("default", {})
+
+    # Check if roles are defined in config defaults
+    for role in agent_roles:
+        default_model_name = default_section.get(role)
+        if default_model_name and default_model_name in models:
+            original = models[default_model_name]
+            selected_models[role] = LLModel(
+                model_name=original.model_name,
+                api_key=original.api_key,
+                endpoint=original.endpoint,
+            )
+            print(f"Using default model for {role}: {default_model_name}")
+        else:
+            # Ask user to select a model for this role
+            print(f"\nChoose a model for {role}:")
+            print(f"Description: {agent_roles[role]}")
+            for i, name in enumerate(model_names):
+                print(f"\t{i}) {name}")
+
+            while True:
+                try:
+                    choice = int(input(f"Enter number for {role}: "))
+                    if 0 <= choice < len(model_names):
+                        original = models[model_names[choice]]
+                        selected_models[role] = LLModel(
+                            model_name=original.model_name,
+                            api_key=original.api_key,
+                            endpoint=original.endpoint,
+                        )
+                        break
+                    else:
+                        print(f"Please enter a number between 0 and {len(model_names) - 1}")
+                except ValueError:
+                    print("Please enter a valid number")
+
+    return Agents(**selected_models)
+
 def main():
 
     """
@@ -167,9 +241,16 @@ def main():
 
     embedding_model = load_embedding_model(config)
 
+    agents = select_agent_models(models,config)
+
     storage = VectorStorage(
         name="local",
         dimension=embedding_model.get_dimension(),
+        connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
+    )
+
+    term_storage = TermStorage(
+        name="terms",
         connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
     )
 
@@ -202,7 +283,7 @@ def main():
     if args.command == "run-cli":
         print("Running in CLI mode")
         cli_routine(
-            model=models["gemma_3_4B"],
+            agents=agents,
             embedding_model=embedding_model,
             vector_storage=storage,
         )

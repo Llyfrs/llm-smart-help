@@ -27,6 +27,15 @@ class LLModel:
             api_key=api_key,
         )
 
+    def __copy__(self):
+        # shallow copy: shares the same client but new usage slot
+        cls = self.__class__
+        new = cls(self.model_name, self.api_key, self.endpoint, self.system_prompt)
+        # you might choose to share or reinstantiate the client:
+        new.client = self.client
+        new.usage = None
+        return new
+
     def generate_response(
         self,
         prompt: str,
@@ -78,7 +87,11 @@ class LLModel:
         self.usage = response.usage
 
         if structure is not None:
-            return structure.model_validate_json(response.choices[0].message.content)
+            try:
+                return structure.model_validate_json(response.choices[0].message.content)
+            except:
+                print("Failed to validate structure. Your chosen model most likely doesn't support structured output.")
+                exit(1)
         else:
             return response.choices[0].message.content
 
