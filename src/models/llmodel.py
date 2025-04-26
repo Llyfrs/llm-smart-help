@@ -55,16 +55,19 @@ class LLModel:
             for url in image_urls:
                 images.append({"type": "image_url", "image_url": {"url": url}})
 
+        messages = []
+
+        if self.system_prompt is not None:
+            messages.append({"role": "system", "content": self.system_prompt})
+
+        messages.append({
+            "role": "user",
+            "content": [{"type": "text", "text": prompt}] + images,  # Merge text + images
+        })
+
         settings = {
             "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": [{"type": "text", "text": prompt}]
-                    + images,  # Merge text + images into one list
-                },
-            ],
+            "messages": messages,
         }
 
         if structure is not None:

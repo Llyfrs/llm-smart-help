@@ -179,11 +179,10 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
     agent_roles = {
         "main_model": "Model that will use all provided information and actually answer the question to the user. "
                       "Quality of this model will impact the quality of response and preferable capable models should be chosen. ",
+        "main_researcher_model": "Generates search queries (needs good instruction following but doesn't need to be large)",
         "term_extraction_model": "Extracts key terms from text it needs good parsing ability and support structured outputs. Otherwise can be very small.",
         "term_researcher_model": "Creates concise term definitions (needs good summarization + structured outputs)",
-        "query_generator_model": "Generates search queries (needs good instruction following but doesn't need to be large)",
         "query_researcher_model": "Processes search results (needs strong comprehension)",
-        "judge_model": "Evaluates quality of results (best for reasoning models + needs to support structured outputs)"
     }
 
     selected_models = {}
@@ -269,7 +268,7 @@ def main():
 
         chunker = Chunker(
             chunk_size=embedding_model.get_dimension(),
-            chunk_strategy="balanced",
+            chunk_strategy="max_tokens",
             tokenizer=embedding_model.tokenize,
         )
 

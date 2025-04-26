@@ -12,6 +12,7 @@ poetry.lock.bak
 .cache/
 
 data/*
+items
 wiki/
 /config.toml
 cache_folder

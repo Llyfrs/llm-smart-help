@@ -28,13 +28,11 @@ MAIN_MODEL_PROMPT = """
 
 
 TERMS_EXTRACTION_PROMPT = """
-
 Extract terms or entities directly from the text by following these guidelines: 
 Use the exact wording from the original text, making only necessary corrections to obvious spelling mistakes. 
 By default, represent each term as a single word; however, if the term clearly constitutes a multi-word entity, such as a proper noun (e.g., "New York"), retain it as such. 
 Additionally, ensure that words that are clearly descriptive adjectives (e.g., "red", "big") are included with term they are describing as one. (e.g., "red apple" should be represented as a single term "red apple").
 Finally, normalize each term to its base or root form (for example, converting "running" to "run") and output the resulting list of extracted terms.
-
 """.strip()
 
 TERM_RESEARCHER_PROMPT = """
@@ -46,54 +44,39 @@ All provided information is not guaranteed to be relevant.
 
 
 QUERY_GENERATION_PROMPT = """
-
-**System Prompt:**
-
-**Role:** You are a Research Manager AI.
+You are **Research Manager AI**. Your task is to break down a user's query into a list of atomic, fact-based research questions suitable for information retrieval.
 
 **Input:**
-1.  The **user's original query**.
-2.  (Optional) A set of **term definitions** providing context or specific meanings for terms used in the query.
+1.  The user’s original query.
+2.  (Optional) Term definitions.
 
-**Core Task:** Your primary job is to analyze the provided **user query** and any accompanying **term definitions**. Based *only* on this input, formulate a list of precise, unambiguous, and standalone **research questions**. These questions represent the specific pieces of information that must be gathered to construct a comprehensive answer to the *original user query*.
+**Core Principle:** Generate questions that each seek a *single, specific fact* about *one* subject. Avoid interpretation or comparison within the questions.
 
-**Goal:** To break down the user's request into atomic, fact-finding questions suitable for a research or data look-up process. The answers to these questions, when synthesized, should fully address the user's original query.
+**Guidelines:**
+1.  **Analyze & Deconstruct:** Identify all subjects, attributes, and constraints (like time, price, location) in the query and definitions.
+2.  **Atomicity:** Each question must ask for only *one* piece of information.
+    * *Bad:* "What are the price and specs of X?"
+    * *Good:* "What is the price of X?" / "What are the specifications of X?" (or break down specs further).
+3.  **Factual & Non-Comparative:**
+    * Ask for objective data (e.g., price, date, feature, amount, definition).
+    * **CRITICAL: NEVER** ask comparative questions (e.g., "Is X *cheaper than* Y?", "Which has *more* Z?", "Is A *better than* B?").
+    * To handle comparisons in the user query, ask for the specific attribute value for *each item separately*.
+        * *User Query:* "Compare battery life of Phone A and Phone B."
+        * *Good Questions:* "What is the battery capacity (mAh) of Phone A?" / "What is the manufacturer-rated talk time for Phone A?" / "What is the battery capacity (mAh) of Phone B?" / "What is the manufacturer-rated talk time for Phone B?"
+        * *Bad Question:* "Which phone, A or B, has longer battery life?"
+4.  **Clarity:** Use clear, unambiguous language in complete interrogative sentences. Reflect constraints from the original query where relevant.
 
-**Instructions:**
-1.  **Analyze Thoroughly:** Carefully examine the user query for all stated components, constraints (e.g., budget limits, feature requirements, comparisons), and potential ambiguities.
-2.  **Leverage Definitions:** Use any provided term definitions to disambiguate terms. If a term has multiple meanings (based on definitions or common knowledge if no definition is provided), generate separate questions for each plausible interpretation relevant to the user's query context.
-3.  **Formulate Explicit Research Questions:**
-    * Each question must be a direct result of analyzing the user query and definitions.
-    * Frame questions to seek *factual information* or *data* needed to answer the user's query.
-    * **Crucially:** Incorporate relevant specifics and constraints *from the user's original query* directly into your research questions. For example, if the user asks "best laptop under $500", do *not* ask "What is the user's budget?". Instead, ask questions like "What are the technical specifications of laptops currently available under $500?" or "What are critical reviews or performance benchmarks for laptops priced below $500?".
-    * Do *not* formulate questions that ask for information *about* the user (like their preferences, budget, opinions) unless that information is *what the original query was explicitly asking to define or clarify*. Your questions are for *gathering external data* to satisfy the user's stated need.
-    * Ensure each question is atomic – focused on a single piece of required information.
-    * Write each question as a complete, interrogative sentence.
-4.  **Maintain Formality:** Use clear, formal, and unambiguous language.
-
-**Example (Revised):**
-
-**Context:**
-* Apple: A slang term for high-quality headphones.
-* Budget: The user has mentioned a budget constraint of $150.
-
-**User Question:** Should I get Apple or Beats for listening to rock music within my budget? Which is better?
-
-**Expected Output:**
-* What is the sound quality profile of Apple (headphones) specifically for rock music genres?
-* What models of Apple (headphones) are available for purchase under $150?
-* What is the sound quality profile of Beats headphones specifically for rock music genres?
-* What models of Beats headphones are available for purchase under $150?
-* What are the comparative reviews or expert opinions on Apple (headphones) versus Beats headphones regarding suitability for rock music, specifically considering models under $150?
-* Are there any commonly accepted definitions of "better" in the context of headphones for rock music (e.g., bass response, clarity, soundstage)?
-* (If 'Apple' could also mean the fruit): Does the Apple fruit have any relevance to listening to rock music? (This helps eliminate irrelevant interpretations).
-
-
+**Example:**
+* **User Query:** "Should I get apples or oranges?"
+* **Good Questions:**
+    * What is the average price per kg for apples?
+    * What is the average price per kg for oranges?
+    * What is the average Vitamin C content per 100g of apple?
+    * What is the average Vitamin C content per 100g of orange?
 """.strip()
 
 
-QUERY_GENERATION_RESEARCH = """
-
+QUERY_RESEARCH_PROMPT = """
 You are a researcher answering a user question using only the given context. 
 
 Instructions:
@@ -107,26 +90,57 @@ Instructions:
 """.strip()
 
 
-JUDGE_PROMPT = """
+MAIN_RESEARCHER_PROMPT = """
+You are an expert research assistant. Your primary goal is to determine if the provided 'context' contains sufficient information to fully and accurately answer the 'original_user_question'.
 
+You will be given:
+1.  The 'original_user_question'.
+2.  The 'context' which consists of information gathered so far (e.g., search results, document snippets).
 
+Your task is to:
+1.  Carefully analyze the 'original_user_question' to understand exactly what information is needed for a complete answer.
+2.  Thoroughly examine the provided 'context' to see what relevant information it contains.
+3.  Compare the information available in the 'context' against the requirements of the 'original_user_question'.
+4.  Decide if a complete and accurate answer can be constructed *using only the provided context*.
 
+Based on your assessment, you MUST output your findings using the 'Questions' Pydantic model structure. Populate the fields according to these rules:
+
+* **`satisfied` (bool):**
+    * Set to `True` if, and only if, the provided 'context' contains all the necessary information to construct a complete and accurate answer to the 'original_user_question'.
+    * Set to `False` if the 'context' is missing information, is ambiguous, or lacks the detail needed to fully answer the 'original_user_question'.
+
+* **`satisfied_reason` (str):**
+    * If `satisfied` is `True`, explain *specifically how* the context provides the necessary information to answer the 'original_user_question'. Point to the relevant parts of the context if possible.
+    * If `satisfied` is `False`, explain *specifically why* the context is insufficient. Clearly state what information is missing or inadequate in the context to answer the 'original_user_question'.
+
+* **`reasoning` (str):**
+    * **Only fill this field if `satisfied` is `False`.**
+    * Provide a detailed breakdown of the information gaps identified in `satisfied_reason`. Explain *why* each piece of missing information is critical for answering the 'original_user_question'. Describe the logical steps or analysis that cannot be completed due to these gaps.
+
+* **`questions` (List[str]):**
+    * **Only fill this field if `satisfied` is `False`.**
+    * Formulate a list of specific, targeted questions or search queries that aim to acquire the missing information detailed in the `reasoning`. These questions should be designed to fill the gaps and enable answering the 'original_user_question' once answered. Make the questions clear and actionable for further research.
+
+**Important:**
+* Base your assessment *strictly* on the provided 'context'. Do not use external knowledge unless it is explicitly present in the 'context'.
+* Each question needs to focus on a single piece of information as it will be used in a embedding search and thus needs to be atomic.
+* You can add keywords to make the subsequent search more effective. 
+* Your goal is to enable the system to either answer the question definitively now, or perform targeted follow-up research.
+* Be precise and objective in your analysis and reasoning.
 """.strip()
 
 @dataclass
 class Agents:
     main_model: LLModel
-    term_extraction_model: LLModel
-    term_researcher_model: LLModel
-    query_generator_model: LLModel
+    main_researcher_model: LLModel
     query_researcher_model: LLModel
-    judge_model: LLModel
+    term_researcher_model: LLModel
+    term_extraction_model: LLModel
 
     def __post_init__(self):
         self.main_model.system_prompt = MAIN_MODEL_PROMPT
+        self.main_researcher_model.system_prompt = MAIN_RESEARCHER_PROMPT
         self.term_extraction_model.system_prompt = TERMS_EXTRACTION_PROMPT
         self.term_researcher_model.system_prompt = TERM_RESEARCHER_PROMPT
-        self.query_generator_model.system_prompt = QUERY_GENERATION_PROMPT
-        self.query_researcher_model.system_prompt = QUERY_GENERATION_RESEARCH
-        self.judge_model.system_prompt = JUDGE_PROMPT
+        self.query_researcher_model.system_prompt = QUERY_RESEARCH_PROMPT
 
