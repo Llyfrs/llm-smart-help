@@ -13,6 +13,7 @@ from src.models.llmodel import LLModel
 from src.models.st_embedding import STEmbedding
 from src.routines.cli_routine import cli_routine
 from src.routines.embedding_routine import embedding_routine
+from src.routines.generate_answers_routine import generate_answers
 from src.vectordb.term_storage import TermStorage
 from src.vectordb.vector_storage import VectorStorage
 
@@ -22,15 +23,15 @@ import toml  # assuming you're using toml to load your config
 
 
 
-def argparse_args():
+import argparse
 
+def argparse_args():
     """
     This function parses command line arguments and returns them.
-    :return:
     """
 
     parser = argparse.ArgumentParser(description="My App")
-    # global config file argument
+
     parser.add_argument(
         "--config",
         type=str,
@@ -38,46 +39,47 @@ def argparse_args():
         help="Path to config.toml file (default: config.toml)"
     )
 
-    # Creating subparsers for mutually exclusive commands
     subparsers = parser.add_subparsers(dest="command", required=True, help="Subcommands")
 
-    # Embedding command with subcommands 'update' and 'create'
+    # embedding with update/create
     embedding_parser = subparsers.add_parser("embedding", help="Embedding related commands")
     embedding_subparsers = embedding_parser.add_subparsers(dest="action", required=True,
                                                            help="Update or create dictionary")
-
-    # embedding update command
     update_parser = embedding_subparsers.add_parser("update", help="Update embedding dictionary")
-    update_parser.add_argument(
-        "path",
-        nargs="?",
-        type=str,
-        help="Optional path to dictionary"
-    )
-
-    # embedding create command
+    update_parser.add_argument("path", nargs="?", type=str, help="Optional path to dictionary")
     create_parser = embedding_subparsers.add_parser("create", help="Create embedding dictionary")
-    create_parser.add_argument(
-        "path",
-        nargs="?",
-        type=str,
-        help="Optional path to dictionary"
-    )
+    create_parser.add_argument("path", nargs="?", type=str, help="Optional path to dictionary")
 
-    # run-cli command (no extra args)
+    # run-cli
     subparsers.add_parser("run-cli", help="Run CLI mode")
 
-    # run-discord-module command with optional port/address overrides
+    # run-discord-module
     discord_parser = subparsers.add_parser("run-discord-module", help="Run Discord module")
     discord_parser.add_argument("--port", type=int, help="Port for the Discord module")
     discord_parser.add_argument("--address", type=str, help="Address for the Discord module")
 
-    # run-server command with optional port/address overrides
+    # run-server
     server_parser = subparsers.add_parser("run-server", help="Run server mode")
     server_parser.add_argument("--port", type=int, help="Port for the server")
     server_parser.add_argument("--address", type=str, help="Address for the server")
 
+    # ✨ new subcommands
+    gen_parser = subparsers.add_parser("generate-answers", help="Generate answers from CSV")
+    gen_parser.add_argument(
+        "path",
+        type=str,
+        help="Path to CSV file for generating answers"
+    )
+
+    eval_parser = subparsers.add_parser("evaluate", help="Evaluate results from CSV")
+    eval_parser.add_argument(
+        "path",
+        type=str,
+        help="Path to CSV file for evaluation"
+    )
+
     return parser.parse_args()
+
 
 def get_config_or_arg(arg_value, config, key, error_msg=None):
     if arg_value is not None:
@@ -292,6 +294,15 @@ def main():
 
     if args.command == "run-server":
         print("Running server")
+
+    if args.command == "generate-answers":
+        generate_answers(
+            path=args.path,
+            agents=agents,
+            embedding_model=embedding_model,
+            vector_storage=storage,
+        )
+
 
 
 

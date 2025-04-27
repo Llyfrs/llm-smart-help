@@ -100,11 +100,13 @@ class Chunker:
             # We are entering this code only if the section is too long
             if isinstance(section, Document):
 
+
+
                 ## To maximize the size of the chunks we split document in to two halves
                 if self.chunk_strategy == "max_tokens":
                     # If the document is too long, split it into two halves
-                    if len(section.sections) == 1:
-                        queue.extend(section.sections)
+                    if len(section.sections) <= 1:
+                        queue[:0] = section.sections
                         continue
 
                     half = round(len(section.sections) / 2)
@@ -130,12 +132,14 @@ class Chunker:
                 Sections are very similar to documents and their splitting strategy follows the same logic.
                 """
 
+
+
                 ## For explanations on the splitting strategy see the code above
                 if self.chunk_strategy == "max_tokens":
 
                     # If the section is too long, split it into two halves
-                    if len(section.content) == 1:
-                        queue.extend(section.content)
+                    if len(section.content) <= 1:
+                        queue[:0] = section.content
                         continue
 
                     half = round(len(section.content) / 2)
@@ -160,6 +164,7 @@ class Chunker:
                 Generally we want tables to be chunked together, and only split if needed,
                 with the header preserved, for bot half's for context.
                 """
+
 
                 ## This unfortunately does happen on smaller models
                 if len(section.rows) <= 1:

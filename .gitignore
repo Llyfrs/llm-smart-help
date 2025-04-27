@@ -16,3 +16,5 @@ items
 wiki/
 /config.toml
 cache_folder
+
+*.csv

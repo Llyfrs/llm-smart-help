@@ -49,9 +49,14 @@ def cli_routine(
             print(colored_text(f"Term: {term}", "blue"))
             print(colored_text(f"Explanation: {explanation}", "yellow"))
 
-        for question, answer_text in answer.questions.items():
-            print(colored_text(f"Question: {question}", "cyan"))
-            print(colored_text(f"Answer: {answer_text}", "magenta"))
+        for desision in answer.satisfactions:
+            print(colored_text(f"\nSatisfied Reason: {desision.satisfied_reason}", "cyan"))
+            print(colored_text(f"Question Response: {desision.reasoning}", "cyan"))
+
+            for question in desision.questions:
+                print(colored_text(f"Question: {question.question_text}", "magenta"))
+                print(colored_text(f"Keywords: {question.keywords}", "yellow"))
+                print(colored_text(f"Answer: {answer.questions[question.question_text]}", "white"))
+
 
         print(colored_text(f"Final Answer: {answer.final_answer}", "green"))
-        break

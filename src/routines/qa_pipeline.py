@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from email.policy import default
 from typing import List
 
 from src.models import EmbeddingModel
@@ -13,6 +12,7 @@ from src.vectordb.vector_storage import VectorStorage
 @dataclass
 class QAPipelineResult:
     terms: dict[str, str] = field(default_factory=dict)
+    satisfactions: List[Questions] = field(default_factory=list)
     questions: dict[str, str] = field(default_factory=dict)
     used_context: List[Vector] = field(default_factory=list)
     final_answer: str = ""
@@ -23,7 +23,7 @@ def run_qa_pipeline(
     agents: Agents,
     embedding_model: EmbeddingModel,
     vector_storage: VectorStorage,
-    max_iterations: int = 3,
+    max_iterations: int = 5,
 ) -> QAPipelineResult:
     """
     🚀 Full QA pipeline from term extraction → final answer.
@@ -64,16 +64,11 @@ def run_qa_pipeline(
             prompt=qgen_prompt, structure=Questions
         )
 
+        final_result.satisfactions.append(questions_struct)
+
         # Check if the questions are satisfied
         if questions_struct.satisfied:
-            print("All questions are satisfied.")
-            print("Satisfied reason:", questions_struct.satisfied_reason, "\n")
             break
-        else:
-            print("Questions are not satisfied.")
-            print("Reasoning:", questions_struct.reasoning)
-            print("Questions:", questions_struct.questions, "\n")
-
 
         # 📚 4) Question research
         question_answers: dict[str, str] = {}
@@ -92,7 +87,7 @@ def run_qa_pipeline(
         qgen_prompt += "\n\n".join(f"Question: {q}\nAnswer: {a}" for q, a in question_answers.items())
 
     # 🏁 5) Final answer
-    final_context = f"**Context**\n{qgen_prompt}\n\nUser Query: {user_query}"
+    final_context = f"{qgen_prompt}\n\nUser Query: {user_query}"
     final_answer = agents.main_model.generate_response(prompt=final_context).strip()
 
     final_result.final_answer = final_answer

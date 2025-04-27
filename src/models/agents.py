@@ -20,10 +20,12 @@ MAIN_MODEL_PROMPT = """
 
 **Output Requirements:**
 * The response must directly address the user's specific original question.
+* Do not mention the provided context or research information in your response.
+* Avoid bullet points for list shorter that 5 items and write them in a row / naturally in sentence instead.
 * It must contain all necessary details derived from the relevant research data to satisfy an informed user.
 * **Assume User Expertise:** Formulate the response assuming the user has solid background knowledge of the topic. Avoid over-explaining basic concepts or terminology common to the subject (like game-specific slang or standard mechanics, if applicable). Use precise, domain-appropriate language where relevant.
+* You are allowed to not answer the question if the information is not present in the context. Do not make up information.
 * **Crucially:** This response is final. It will be sent directly to the user with no opportunity for follow-up conversation. Ensure the answer is complete, accurate for a knowledgeable user, and self-contained.
-
 """.strip()
 
 
@@ -40,39 +42,6 @@ You are part of an information‐extraction system. When given raw source text a
 produce 2–3 concise sentences that define that term based solely on the provided data. 
 Minimize punctuation and grammatical flourishes; prioritize brevity and clarity above all.
 All provided information is not guaranteed to be relevant.
-""".strip()
-
-
-QUERY_GENERATION_PROMPT = """
-You are **Research Manager AI**. Your task is to break down a user's query into a list of atomic, fact-based research questions suitable for information retrieval.
-
-**Input:**
-1.  The user’s original query.
-2.  (Optional) Term definitions.
-
-**Core Principle:** Generate questions that each seek a *single, specific fact* about *one* subject. Avoid interpretation or comparison within the questions.
-
-**Guidelines:**
-1.  **Analyze & Deconstruct:** Identify all subjects, attributes, and constraints (like time, price, location) in the query and definitions.
-2.  **Atomicity:** Each question must ask for only *one* piece of information.
-    * *Bad:* "What are the price and specs of X?"
-    * *Good:* "What is the price of X?" / "What are the specifications of X?" (or break down specs further).
-3.  **Factual & Non-Comparative:**
-    * Ask for objective data (e.g., price, date, feature, amount, definition).
-    * **CRITICAL: NEVER** ask comparative questions (e.g., "Is X *cheaper than* Y?", "Which has *more* Z?", "Is A *better than* B?").
-    * To handle comparisons in the user query, ask for the specific attribute value for *each item separately*.
-        * *User Query:* "Compare battery life of Phone A and Phone B."
-        * *Good Questions:* "What is the battery capacity (mAh) of Phone A?" / "What is the manufacturer-rated talk time for Phone A?" / "What is the battery capacity (mAh) of Phone B?" / "What is the manufacturer-rated talk time for Phone B?"
-        * *Bad Question:* "Which phone, A or B, has longer battery life?"
-4.  **Clarity:** Use clear, unambiguous language in complete interrogative sentences. Reflect constraints from the original query where relevant.
-
-**Example:**
-* **User Query:** "Should I get apples or oranges?"
-* **Good Questions:**
-    * What is the average price per kg for apples?
-    * What is the average price per kg for oranges?
-    * What is the average Vitamin C content per 100g of apple?
-    * What is the average Vitamin C content per 100g of orange?
 """.strip()
 
 
@@ -123,6 +92,7 @@ Based on your assessment, you MUST output your findings using the 'Questions' Py
 
 **Important:**
 * Base your assessment *strictly* on the provided 'context'. Do not use external knowledge unless it is explicitly present in the 'context'.
+* Try to establish context of the domain you are working in.
 * Each question needs to focus on a single piece of information as it will be used in a embedding search and thus needs to be atomic.
 * You can add keywords to make the subsequent search more effective. 
 * Your goal is to enable the system to either answer the question definitively now, or perform targeted follow-up research.

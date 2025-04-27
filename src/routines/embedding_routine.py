@@ -56,7 +56,6 @@ def embedding_routine(
                     pbar.update(1)
                     continue
 
-
         chunks = chunker.chunk(document)
         contents = [chunk.content for chunk in chunks]
         embeddings = embedding_model.embed(contents)

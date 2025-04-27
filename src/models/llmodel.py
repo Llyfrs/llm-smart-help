@@ -94,7 +94,11 @@ class LLModel:
                 return structure.model_validate_json(response.choices[0].message.content)
             except:
                 print("Failed to validate structure. Your chosen model most likely doesn't support structured output.")
-                exit(1)
+                print(f"Model name: {self.model_name} from {self.endpoint}")
+                print(f"Response: {response.choices[0].message.content}")
+                raise ValueError(
+                    "Failed to validate structure. Your chosen model most likely doesn't support structured output."
+                )
         else:
             return response.choices[0].message.content
 
