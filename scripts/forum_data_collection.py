@@ -1,9 +1,14 @@
+import json
+from urllib.parse import urlparse, parse_qs
+
 from bs4 import BeautifulSoup
 
 from item_data_collection import get, save_to_file
 from markdownify import markdownify as md
-import bbcode
 import html2text
+import os
+
+import bbcode
 
 
 def bbcode_html_to_markdown(raw_input: str) -> str:
@@ -50,8 +55,12 @@ def safe_forum_post(id : str, category_id: str, title:str, path: str, api_key: s
     document += f"## {title}\n\n"
     content = ""
 
+
+
     for post in response:
         if poster_id is None:
+            if (post["likes"] - post["dislikes"]) < 30:
+                break
             poster_id = post["id"]
 
         if post["id"] != poster_id:
@@ -59,6 +68,9 @@ def safe_forum_post(id : str, category_id: str, title:str, path: str, api_key: s
 
         content += post["content"]
 
+    if content == "":
+        # print(f"Skipping Thread: {title}")
+        return
 
 
     content = bbcode_html_to_markdown(content)
@@ -72,6 +84,9 @@ def safe_forum_post(id : str, category_id: str, title:str, path: str, api_key: s
 
     pass
 
+
+
+## This is broken as there is a bug in the API at the time of writing this commnet
 def forum_data_collection(path: str, api_key: str):
     guide_section_id = 61
     url = f"https://api.torn.com/v2/forum/{guide_section_id}/threads?limit=100&sort=ASC&key={api_key}"
@@ -104,9 +119,17 @@ def forum_data_collection(path: str, api_key: str):
     pass
 
 
+def extract_forum_and_thread_ids(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+
+    forum_id = query_params.get('f', [None])[0]
+    thread_id = query_params.get('t', [None])[0]
+
+    return forum_id, thread_id
 
 if __name__ == "__main__":
-    import os
+
 
     api_key = os.getenv("API_KEY")
     if api_key is None:
@@ -114,5 +137,17 @@ if __name__ == "__main__":
 
     path = "items"
 
+    threads = "scripts/threads.json"
 
-    forum_data_collection(path, api_key)
+    with open(threads, "r") as f:
+        threads = json.load(f)
+
+    from tqdm import tqdm
+
+    for thread in tqdm(threads, desc="Processing threads"):
+        try:
+            category, thread_id = extract_forum_and_thread_ids(thread["Link"])
+            if int(thread.get("Rating", 0) or 0) >= 30:
+                safe_forum_post(thread_id, category, thread["Title"], path, api_key)
+        except (ValueError, TypeError):
+            continue  # Skip threads with invalid Rating
