@@ -33,8 +33,8 @@ class LLModel:
     def __copy__(self):
         # shallow copy: shares the same client but new usage slot
         cls = self.__class__
-        new = cls(self.model_name, self.api_key, self.endpoint, self.system_prompt)
-        # you might choose to share or reinstantiate the client:
+        new = cls(self.model_name, self.api_key, self.endpoint, self.system_prompt, self.output_cost, self.input_cost)
+
         new.client = self.client
         new.usage = None
         return new

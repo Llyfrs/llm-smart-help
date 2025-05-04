@@ -32,6 +32,7 @@ def cli_routine(
     agents: Agents,
     embedding_model: EmbeddingModel,
     vector_storage: VectorStorage,
+    global_prompt: str = "",
 ):
     while True:
         user_input = input("You: ")
@@ -43,6 +44,7 @@ def cli_routine(
             agents=agents,
             embedding_model=embedding_model,
             vector_storage=vector_storage,
+            global_prompt=global_prompt,
             max_iterations=5,
         )
 

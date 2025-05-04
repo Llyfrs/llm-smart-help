@@ -1,5 +1,7 @@
 import csv
+import copy
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
 
@@ -9,14 +11,13 @@ from src.routines.qa_pipeline import run_qa_pipeline
 from src.vectordb.vector_storage import VectorStorage
 
 
-def load_csv(path : str):
+def load_csv(path: str):
     with open(path, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
-        data = list(reader)
+        return list(reader)
 
-    return data
 
-def save_csv(path : str, data : list[dict]):
+def save_csv(path: str, data: list[dict]):
     with open(path, 'w', newline='') as csvfile:
         fieldnames = data[0].keys()
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -26,26 +27,15 @@ def save_csv(path : str, data : list[dict]):
             writer.writerow(row)
 
 
-def generate_answers(
-        path: str,
-        agents: Agents,
-        embedding_model: EmbeddingModel,
-        vector_storage: VectorStorage,
-    ):
-    questions = load_csv(path)
-
-    for entry in tqdm(questions, desc="Generating answers", unit="q"):
-        try:
-            answ = run_qa_pipeline(
-                user_query=entry["query"],
-                agents=agents,
-                embedding_model=embedding_model,
-                vector_storage=vector_storage,
-            )
-        except Exception as e:
-            print(f"Error generating answer for query '{entry['query']}': {e}")
-            break
-
+def process_question(entry, agents, embedding_model, vector_storage, global_prompt):
+    try:
+        answ = run_qa_pipeline(
+            user_query=entry["query"],
+            agents=agents,
+            embedding_model=embedding_model,
+            vector_storage=vector_storage,
+            global_prompt=global_prompt,
+        )
         entry["answer"] = answ.final_answer
 
         parts = []
@@ -65,9 +55,44 @@ def generate_answers(
         entry["full_context"] = "\n".join(parts)
         entry["cost"] = answ.cost
         entry["iterations"] = answ.iterations
+    except Exception as e:
+        entry["answer"] = ""
+        entry["full_context"] = f"Error generating answer: {e}"
+        entry["cost"] = ""
+        entry["iterations"] = ""
+
+    return entry
+
+
+def generate_answers(
+        path: str,
+        agents: Agents,
+        embedding_model: EmbeddingModel,
+        vector_storage: VectorStorage,
+        global_prompt: str = "",
+        max_workers: int = 10,
+):
+    questions = load_csv(path)
+
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                process_question,
+                entry=copy.deepcopy(entry),  # Avoid shared mutation
+                agents=copy.copy(agents),    # Separate agents instance per thread
+                embedding_model=embedding_model,
+                vector_storage=vector_storage,
+                global_prompt=global_prompt,
+            )
+            for entry in questions
+        ]
+
+        for f in tqdm(as_completed(futures), total=len(futures), desc="Generating answers", unit="q"):
+            results.append(f.result())
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_file = path.rsplit(".", 1)[0] + f"_answers_{timestamp}.csv"
-    save_csv(out_file, questions)
+    save_csv(out_file, results)
 
     return out_file

@@ -25,6 +25,7 @@ def run_qa_pipeline(
     agents: Agents,
     embedding_model: EmbeddingModel,
     vector_storage: VectorStorage,
+    global_prompt: str = "",
     max_iterations: int = 5,
 ) -> QAPipelineResult:
     """
@@ -36,12 +37,15 @@ def run_qa_pipeline(
 
     EMBED_PROMPT = "Given user query and keywords, retrieve relevant passages that best answer asked question."
 
+
+
+    """
+    
     # 🔍 1) Term extraction
     terms_struct: Terms = agents.term_extraction_model.generate_response(
         prompt=user_query, structure=Terms
     )
-
-    """
+    
     # 📝 2) Term research
     term_explanations: dict[str, str] = {}
     for term in terms_struct.terms:
@@ -63,6 +67,9 @@ def run_qa_pipeline(
     """
 
     qgen_prompt = ""
+
+    if global_prompt != "":
+        qgen_prompt += "Global Context" + global_prompt + "\n\n"
 
     for _ in range(max_iterations):
 

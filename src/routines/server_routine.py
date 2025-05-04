@@ -12,6 +12,7 @@ from src.vectordb.vector_storage import VectorStorage
 _agents: Agents
 _embedding_model: EmbeddingModel
 _vector_storage: VectorStorage
+_global_prompt: str = ""
 
 async def handle_request(request):
     """
@@ -34,6 +35,7 @@ async def handle_request(request):
             agents=copy.copy(_agents),
             embedding_model=_embedding_model,
             vector_storage=_vector_storage,
+            global_prompt=_global_prompt,
             max_iterations=iterations,
         )
 
@@ -68,7 +70,7 @@ async def handle_request(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
-def run_server(agents, embedding_model, vector_storage, address="127.0.0.1", port=8080):
+def run_server(agents, embedding_model, vector_storage, global_prompt , address="127.0.0.1", port=8080):
     """
     Starts server that listens for incoming requests and processes them using the QA pipeline.
     :param agents:  Agents object containing all the models.
@@ -79,10 +81,11 @@ def run_server(agents, embedding_model, vector_storage, address="127.0.0.1", por
     :return:
     """
 
-    global _agents, _embedding_model, _vector_storage
+    global _agents, _embedding_model, _vector_storage, _global_prompt
     _agents = agents
     _embedding_model = embedding_model
     _vector_storage = vector_storage
+    _global_prompt = global_prompt
 
     app = web.Application()
     app.router.add_post("/query", handle_request)

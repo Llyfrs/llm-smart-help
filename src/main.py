@@ -181,8 +181,6 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
         "main_model": "Model that will use all provided information and actually answer the question to the user. "
                       "Quality of this model will impact the quality of response and preferable capable models should be chosen. ",
         "main_researcher_model": "Generates search queries (needs good instruction following but doesn't need to be large)",
-        "term_extraction_model": "Extracts key terms from text it needs good parsing ability and support structured outputs. Otherwise can be very small.",
-        "term_researcher_model": "Creates concise term definitions (needs good summarization + structured outputs)",
         "query_researcher_model": "Processes search results (needs strong comprehension)",
     }
 
@@ -246,6 +244,8 @@ def main():
 
     agents = select_agent_models(models,config)
 
+    global_prompt = config.get("GLOBAL_CONTEXT", "")
+
 
     storage = VectorStorage(
         name=model_name,
@@ -285,6 +285,7 @@ def main():
             agents=agents,
             embedding_model=embedding_model,
             vector_storage=storage,
+            global_prompt=global_prompt,
         )
 
     if args.command == "run-discord-module":
@@ -300,6 +301,7 @@ def main():
             agents=agents,
             embedding_model=embedding_model,
             vector_storage=storage,
+            global_prompt=global_prompt,
             address=address,
             port=port,
         )
@@ -310,10 +312,8 @@ def main():
             agents=agents,
             embedding_model=embedding_model,
             vector_storage=storage,
+            global_prompt=global_prompt,
         )
-
-
-
 
 
 if __name__ == "__main__":
