@@ -1,7 +1,9 @@
 import csv
-from datetime import time, datetime
+from datetime import datetime
 
-from src.models import EmbeddingModel, LLModel
+from tqdm import tqdm
+
+from src.models import EmbeddingModel
 from src.models.agents import Agents
 from src.routines.qa_pipeline import run_qa_pipeline
 from src.vectordb.vector_storage import VectorStorage
@@ -23,10 +25,6 @@ def save_csv(path : str, data : list[dict]):
         for row in data:
             writer.writerow(row)
 
-
-from tqdm import tqdm
-
-from tqdm import tqdm
 
 def generate_answers(
         path: str,
@@ -65,6 +63,8 @@ def generate_answers(
                 parts.append(f"Answer: {answer_text}")
 
         entry["full_context"] = "\n".join(parts)
+        entry["cost"] = answ.cost
+        entry["iterations"] = answ.iterations
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_file = path.rsplit(".", 1)[0] + f"_answers_{timestamp}.csv"

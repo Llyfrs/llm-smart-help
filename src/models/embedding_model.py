@@ -12,7 +12,7 @@ class EmbeddingModel(ABC):
         Initialize the embedding model.
         :param prompt: Prompt to be used for the embedding model.
         """
-
+        self.model_name = None
         self.prompt = prompt
 
     def apply_prompt(self, instruction: str, query: str) -> str:
@@ -58,3 +58,10 @@ class EmbeddingModel(ABC):
         """Return the dimension of the embedding."""
         pass
 
+    @abstractmethod
+    def max_tokens(self) -> int:
+        """
+        Return the maximum number of tokens for the model.
+        :return: Maximum number of tokens.
+        """
+        return 0

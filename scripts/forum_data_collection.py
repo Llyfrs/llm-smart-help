@@ -1,49 +1,161 @@
 import json
+import urllib
 from urllib.parse import urlparse, parse_qs
 
-from bs4 import BeautifulSoup
+
+
 
 from item_data_collection import get, save_to_file
-from markdownify import markdownify as md
-import html2text
 import os
 
-import bbcode
+
+import urllib.parse # For handling relative URLs if needed
+
+from markdownify import markdownify as md
+from bs4 import BeautifulSoup, NavigableString
+import urllib.parse
+import re
+
+
+def preprocess_html_for_markdown(soup, base_url=None):
+    """
+    Cleans and simplifies HTML specifically for better Markdown conversion.
+    - Resolves relative URLs.
+    - Tries to convert simple style spans (bold/italic) to semantic tags.
+    - Removes problematic style attributes.
+    - Handles divs used for alignment (removes alignment, keeps content).
+    """
+
+    # 1. Resolve relative URLs
+    if base_url:
+        for tag in soup.find_all(['a', 'img'], href=lambda x: x is not None and not urllib.parse.urlparse(x).scheme):
+            attr = 'href' if tag.name == 'a' else 'src'
+            try:
+                tag[attr] = urllib.parse.urljoin(base_url, tag[attr])
+            except Exception:
+                pass  # Ignore if URL joining fails
+
+    # 2. Simplify common styling spans (basic example, can be expanded)
+    #    Note: This is tricky and might not catch all cases or have side effects.
+    #    It's often better to let markdownify handle strong/em directly if possible.
+    # for span in soup.find_all("span"):
+    #    style = span.get("style", "").lower()
+    #    if "font-weight:bold" in style or "font-weight: 700" in style:
+    #         span.wrap(soup.new_tag("strong"))
+    #         span.unwrap() # Remove the span itself
+    #    elif "font-style:italic" in style:
+    #        span.wrap(soup.new_tag("em"))
+    #        span.unwrap()
+
+    # 3. Remove complex style attributes that confuse Markdown converters
+    #    Focus on keeping structure, not visual styles.
+    for tag in soup.find_all(True):  # Find all tags
+        if 'style' in tag.attrs:
+            # Keep the tag, but ditch the style that markdown can't use
+            # Exception: Maybe keep simple list-style-type if needed? (rare)
+            del tag.attrs['style']
+        # Remove specific attributes that don't map well
+        for attr in ['align', 'size', 'color', 'face']:  # Deprecated HTML attributes
+            if attr in tag.attrs:
+                del tag.attrs[attr]
+
+    # 4. Handle DIVs used mainly for alignment/structure
+    #    Replace divs with paragraphs or just unwrap if they add no semantic value.
+    for div in soup.find_all("div"):
+        # If div contains only inline content or phrasing content, maybe convert to <p>
+        # If it contains block content (like lists, other divs), just remove the div wrapper
+        # This is heuristic. A simple approach is often just to unwrap.
+        div.unwrap()  # Removes the <div> tag, keeping its content in place
+
+    # 5. Remove empty tags that might result from cleaning
+    for tag in soup.find_all(
+            lambda t: not isinstance(t, NavigableString) and not t.contents and not t.text.strip() and t.name not in [
+                'br', 'hr', 'img']):
+        tag.decompose()
+
+    return soup
+
+
+def tornhtml_to_markdown(html_content: str, base_url: str = None, **md_options) -> str:
+    """
+    Converts Torn City Forum HTML (potentially with BBCode remnants) to Markdown.
+    Focuses on structure and semantics, styling will be lost.
+
+    Args:
+        html_content: The raw HTML string.
+        base_url: The base URL (e.g., "https://www.torn.com") to resolve relative links.
+        **md_options: Additional options for the markdownify converter.
+
+    Returns:
+        Markdown string or an error message.
+    """
+    if not isinstance(html_content, str):
+        return "Error: Input must be a string."
+    if not html_content.strip():
+        return ""
+
+    try:
+        # --- Metadata Extraction (Optional) ---
+        source = None
+        url = None
+        match_source = re.search(r"^---\s*\n^source:\s*(.*?)\s*$", html_content, re.MULTILINE)
+        match_url = re.search(r"^url:\s*(.*?)\s*$", html_content, re.MULTILINE)
+        if match_source:
+            source = match_source.group(1).strip()
+        if match_url:
+            url = match_url.group(1).strip()
+
+        # Remove the metadata block for cleaner HTML parsing
+        html_body = re.sub(r"^---\s*$.*?^---\s*$\n?", "", html_content, flags=re.MULTILINE | re.DOTALL).strip()
+        # Also remove the initial H2 if it exists right after metadata
+        html_body = re.sub(r"^## .*?\n+", "", html_body).strip()
+
+        # 1. Parse the core HTML content
+        soup = BeautifulSoup(html_body, 'html.parser')
+
+        # 2. Preprocess: Clean HTML, fix URLs
+        cleaned_soup = preprocess_html_for_markdown(soup, base_url)
+        final_html = str(cleaned_soup)
+
+        # 3. Convert cleaned HTML to Markdown
+        default_md_options = {
+            'heading_style': 'ATX',
+            'strip': ['script', 'style'],  # Strip remaining styles if any
+            'keep_inline_images_in': ['p', 'li', 'td', 'th'],
+            'newline_style': 'unix',
+            'strong_em_symbol': '*',  # Use '*' for both bold/italic if desired, or default is usually fine
+            'bullets': '-*',  # Use - or * for list items
+            'escape_underscores': True,  # Prevent underscores in text from being italics
+        }
+        final_md_options = {**default_md_options, **md_options}
+
+        markdown_output = md(final_html, **final_md_options)
+
+        # --- Re-add Metadata (Optional) ---
+        metadata_prefix = ""
+        if source or url:
+            metadata_prefix = "---\n"
+            if source: metadata_prefix += f"source: {source}\n"
+            if url: metadata_prefix += f"url: {url}\n"
+            metadata_prefix += "---\n\n"
+
+        # Add back the initial H2 if it was removed (optional, depends if you want it)
+        # title_match = re.search(r"^## (.*?)\n", html_content)
+        # title_prefix = title_match.group(0) if title_match else ""
+
+        return metadata_prefix + markdown_output  # + title_prefix
+
+    except Exception as e:
+        import traceback
+        # print(f"Conversion Error: {e}\n{traceback.format_exc()}") # Uncomment for debugging
+        raise "Conversion Error" from e
 
 
 def bbcode_html_to_markdown(raw_input: str) -> str:
-    # 1. Parse & fix broken HTML
-    soup = BeautifulSoup(raw_input, 'html.parser')
-    cleaned_html = str(soup)
+    return tornhtml_to_markdown(raw_input, base_url="https://www.torn.com", heading_style="ATX",
+                                strip=["script", "style"], keep_inline_images_in=["p", "li", "td", "th"],
+                                newline_style="unix", strong_em_symbol="*", bullets="-*", escape_underscores=True)
 
-    # 2. Convert to Markdown
-    return md(cleaned_html, heading_style="ATX")
-
-"""
-{
-      "id": 15977639,
-      "title": "Stock Analyst",
-      "forum_id": 61,
-      "posts": 65,
-      "rating": 88,
-      "views": 11310,
-      "author": {
-        "id": 258120,
-        "username": "Harley",
-        "karma": 23929
-      },
-      "last_poster": {
-        "id": 3391134,
-        "username": "Tamirys",
-        "karma": 87
-      },
-      "first_post_time": 1468939924,
-      "last_post_time": 1744581675,
-      "has_poll": false,
-      "is_locked": false,
-      "is_sticky": false
-    }
-"""
 
 def safe_forum_post(id : str, category_id: str, title:str, path: str, api_key: str):
     url = f"https://api.torn.com/v2/forum/{id}/posts?striptags=false" + f"&key={api_key}"
@@ -79,8 +191,6 @@ def safe_forum_post(id : str, category_id: str, title:str, path: str, api_key: s
     clear_title = title.replace(" ", "_").replace(":", "_").replace("?", "_").replace("/", "_")
 
     save_to_file(document, clear_title, path)
-
-
 
     pass
 

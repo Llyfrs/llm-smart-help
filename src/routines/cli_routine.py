@@ -43,6 +43,7 @@ def cli_routine(
             agents=agents,
             embedding_model=embedding_model,
             vector_storage=vector_storage,
+            max_iterations=5,
         )
 
         for term, explanation in answer.terms.items():
@@ -51,12 +52,14 @@ def cli_routine(
 
         for desision in answer.satisfactions:
             print(colored_text(f"\nSatisfied Reason: {desision.satisfied_reason}", "cyan"))
-            print(colored_text(f"Question Response: {desision.reasoning}", "cyan"))
+            print(colored_text(f"\nQuestion Reason: {desision.reasoning}", "cyan"))
 
             for question in desision.questions:
                 print(colored_text(f"Question: {question.question_text}", "magenta"))
                 print(colored_text(f"Keywords: {question.keywords}", "yellow"))
                 print(colored_text(f"Answer: {answer.questions[question.question_text]}", "white"))
 
+        print(colored_text(f"Cost: ${answer.cost}", "red"))
+        print(colored_text(f"Iterations: {len(answer.satisfactions)}", "green"))
 
         print(colored_text(f"Final Answer: {answer.final_answer}", "green"))

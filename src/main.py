@@ -1,10 +1,8 @@
 """
 This is the main file for the project.
 """
-from dataclasses import dataclass
-from typing import Dict, Any, Type
-
-
+import copy
+from typing import Dict, Any, Union
 
 from src.document_parsing import Chunker
 from src.models import OAEmbedding, EmbeddingModel
@@ -14,15 +12,10 @@ from src.models.st_embedding import STEmbedding
 from src.routines.cli_routine import cli_routine
 from src.routines.embedding_routine import embedding_routine
 from src.routines.generate_answers_routine import generate_answers
-from src.vectordb.term_storage import TermStorage
 from src.vectordb.vector_storage import VectorStorage
+from src.routines.server_routine import run_server
 
-import argparse
 import toml  # assuming you're using toml to load your config
-
-
-
-
 import argparse
 
 def argparse_args():
@@ -55,13 +48,13 @@ def argparse_args():
 
     # run-discord-module
     discord_parser = subparsers.add_parser("run-discord-module", help="Run Discord module")
-    discord_parser.add_argument("--port", type=int, help="Port for the Discord module")
-    discord_parser.add_argument("--address", type=str, help="Address for the Discord module")
+    discord_parser.add_argument("--guild-id", type=int, help="Limit Discord Bot to this guild")
+    discord_parser.add_argument("--chat-id", type=str, help="Limit Discord Bot to this chat")
 
     # run-server
     server_parser = subparsers.add_parser("run-server", help="Run server mode")
-    server_parser.add_argument("--port", type=int, help="Port for the server")
-    server_parser.add_argument("--address", type=str, help="Address for the server")
+    server_parser.add_argument("--port", type=int, help="Port for the Discord module")
+    server_parser.add_argument("--address", type=str, help="Address for the Discord module")
 
     # ✨ new subcommands
     gen_parser = subparsers.add_parser("generate-answers", help="Generate answers from CSV")
@@ -105,28 +98,30 @@ def get_required_config(config, key, error_msg=None):
     return value
 
 
-def load_llmodels(config : Dict[str, Dict[str, str]]) -> Dict[str, LLModel]:
+def load_llmodels(config: Dict[str, Dict[str, Union[str, float]]]) -> Dict[str, LLModel]:
     models = dict()
     for model in config["model"]:
         model_name = config["model"][model]["model_name"]
         endpoint = config["model"][model]["base_url"]
         api_key = config["model"][model]["api_key"]
+        input_cost = config["model"][model].get("input_cost", 0)
+        output_cost = config["model"][model].get("output_cost", 0)
         ll_model = LLModel(
             model_name=model_name,
             endpoint=endpoint,
             api_key=api_key,
+            input_cost=input_cost,
+            output_cost=output_cost,
         )
-        # print(f"Found llm model \"{model}\" in config file")
         models[model] = ll_model
 
     return models
 
 def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
-
     """
     Looks if default embedding model is selected and if not asks user what embedding model to use.
     :param config:
-    :return:
+    :return: embedding model
     """
 
     embed_model_names = list(config["embedding_model"].keys())
@@ -152,10 +147,14 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
     endpoint = model_config.get("base_url")
     dimension = model_config.get("dimension")
     prompt = model_config.get("prompt")
+    strategy = model_config.get("chunk_strategy", "max_tokens")
+
+    if strategy not in ["max_tokens", "min_tokens", "balanced"]:
+        raise ValueError(f"Invalid chunk strategy: {strategy}. Choose from 'max_tokens', 'min_tokens', or 'balanced'.")
 
     if api_key is None or endpoint is None or dimension is None:
         print(f'Loading local embedding model "{name}", this might take a while')
-        model = STEmbedding(name, cache_folder="cache_folder", prompt=prompt)
+        model = STEmbedding(model_name=name, cache_folder="cache_folder", prompt=prompt)
         print("Model loaded successfully")
     else:
         model = OAEmbedding(
@@ -166,7 +165,7 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
             prompt=prompt,
         )
 
-    return model
+    return model, model_name, strategy
 
 
 def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
@@ -199,6 +198,8 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
                 model_name=original.model_name,
                 api_key=original.api_key,
                 endpoint=original.endpoint,
+                input_cost=original.input_cost,
+                output_cost=original.output_cost,
             )
             print(f"Using default model for {role}: {default_model_name}")
         else:
@@ -217,6 +218,8 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
                             model_name=original.model_name,
                             api_key=original.api_key,
                             endpoint=original.endpoint,
+                            input_cost=original.input_cost,
+                            output_cost=original.output_cost,
                         )
                         break
                     else:
@@ -227,9 +230,8 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
     return Agents(**selected_models)
 
 def main():
-
     """
-    Main function for the project.
+    Main function for the project. Loads all the models based on the config file and moves work to the correct routine based on the command line argument.
     :return:
     """
 
@@ -240,18 +242,14 @@ def main():
 
     models = load_llmodels(config)
 
-    embedding_model = load_embedding_model(config)
+    embedding_model, model_name, strategy = load_embedding_model(config)
 
     agents = select_agent_models(models,config)
 
-    storage = VectorStorage(
-        name="local",
-        dimension=embedding_model.get_dimension(),
-        connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
-    )
 
-    term_storage = TermStorage(
-        name="terms",
+    storage = VectorStorage(
+        name=model_name,
+        dimension=embedding_model.get_dimension(),
         connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
     )
 
@@ -269,8 +267,8 @@ def main():
         action = args.action
 
         chunker = Chunker(
-            chunk_size=embedding_model.get_dimension(),
-            chunk_strategy="max_tokens",
+            chunk_size=embedding_model.max_tokens(),
+            chunk_strategy=strategy,
             tokenizer=embedding_model.tokenize,
         )
 
@@ -293,7 +291,18 @@ def main():
         print("Running Discord module")
 
     if args.command == "run-server":
-        print("Running server")
+        print("Running server module")
+
+        address = get_config_or_arg(args.address, config, "address")
+        port = get_config_or_arg(args.port, config, "port")
+
+        run_server(
+            agents=agents,
+            embedding_model=embedding_model,
+            vector_storage=storage,
+            address=address,
+            port=port,
+        )
 
     if args.command == "generate-answers":
         generate_answers(

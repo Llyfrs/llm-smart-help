@@ -15,6 +15,8 @@ class QAPipelineResult:
     satisfactions: List[Questions] = field(default_factory=list)
     questions: dict[str, str] = field(default_factory=dict)
     used_context: List[Vector] = field(default_factory=list)
+    iterations: int = field(default_factory=int)
+    cost : float = field(default_factory=float)
     final_answer: str = ""
 
 
@@ -32,13 +34,14 @@ def run_qa_pipeline(
 
     final_result = QAPipelineResult()
 
-    EMBED_PROMPT = "Give user query, retrieve relevant passages that best answer asked question."
+    EMBED_PROMPT = "Given user query and keywords, retrieve relevant passages that best answer asked question."
 
     # 🔍 1) Term extraction
     terms_struct: Terms = agents.term_extraction_model.generate_response(
         prompt=user_query, structure=Terms
     )
 
+    """
     # 📝 2) Term research
     term_explanations: dict[str, str] = {}
     for term in terms_struct.terms:
@@ -51,18 +54,26 @@ def run_qa_pipeline(
         term_explanations[term] = explanation
         final_result.terms[term] = explanation
         final_result.used_context.extend(docs)
-
+        final_result.cost += agents.term_researcher_model.get_cost()
+    
 
 
     # 🔗 Build context for question generation
     terms_block = "\n".join(f"{t}: {e}" for t, e in term_explanations.items())
-    qgen_prompt = f"**Context**\n{terms_block}\n\nUser Query: {user_query}"
+    """
+
+    qgen_prompt = ""
 
     for _ in range(max_iterations):
+
+        final_result.iterations += 1
+
         # ❓ 3) Question generation
         questions_struct: Questions = agents.main_researcher_model.generate_response(
-            prompt=qgen_prompt, structure=Questions
+            prompt=qgen_prompt + f"'\noriginal_user_question': {user_query}", structure=Questions
         )
+
+        final_result.cost += agents.main_researcher_model.get_cost()
 
         final_result.satisfactions.append(questions_struct)
 
@@ -74,21 +85,24 @@ def run_qa_pipeline(
         question_answers: dict[str, str] = {}
         for q in questions_struct.questions:
             vec = embedding_model.embed([q.question_text + " " + " ".join(q.keywords)], instruction=EMBED_PROMPT)[0].tolist()
-            docs = vector_storage.query(vec, n=4)
-            ctx = "\n".join(d.content for d in docs)
+            docs = vector_storage.query(vec, n=10)
+            ctx = "\n".join("source:" + d.file_name + "\n" + d.content for d in docs)
             ans = agents.query_researcher_model.generate_response(
                 prompt=f"**Context:**\n{ctx}\n\nResearched Question: {q}"
             ).strip()
             question_answers[q.question_text] = ans
             final_result.questions[q.question_text] = ans
             final_result.used_context.extend(docs)
+            final_result.cost += agents.query_researcher_model.get_cost()
 
-        # Update the context for the next iteration
-        qgen_prompt += "\n\n".join(f"Question: {q}\nAnswer: {a}" for q, a in question_answers.items())
+        ## Asked and answered questions
+        qgen_prompt += "\n\n".join(f"---\nQuestion: {q}\nAnswer: {a}\n---" for q, a in question_answers.items())
 
     # 🏁 5) Final answer
     final_context = f"{qgen_prompt}\n\nUser Query: {user_query}"
     final_answer = agents.main_model.generate_response(prompt=final_context).strip()
+
+    final_result.cost += agents.main_model.get_cost()
 
     final_result.final_answer = final_answer
 

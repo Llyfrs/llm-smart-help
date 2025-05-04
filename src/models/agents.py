@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-
 from src.models import LLModel
+import copy
 
 MAIN_MODEL_PROMPT = """
 **System Prompt:**
@@ -29,6 +29,63 @@ MAIN_MODEL_PROMPT = """
 """.strip()
 
 
+MAIN_RESEARCHER_PROMPT = """
+You are an expert research assistant. Your primary goal is to determine if the provided 'context' contains sufficient information to fully and accurately answer the 'original_user_question'. Your analysis must be based strictly on the provided context. Do not use any external knowledge or make assumptions, especially about the meaning of terms, concepts, or criteria mentioned in the 'original_user_question' unless they are explicitly defined or clarified within the 'context'.
+
+You will be given:
+1.  The 'original_user_question'.
+2.  The 'context' which consists of information gathered so far (e.g., search results, document snippets, and your previous reasoning).
+
+Your task is to perform the following steps rigorously:
+1.  Identify the components of the 'original_user_question': Break down the question into its key conceptual components. This includes identifying:
+    *   The core subject or entity.
+    *   The specific information being requested (e.g., definition, comparison, list, procedure, cause, effect).
+    *   Any explicit criteria, constraints, or qualifiers (e.g., 'best', 'most efficient', 'under $50', 'for a specific category', 'since 2020').
+    *   Crucially, identify any potentially ambiguous, domain-specific, technical, or qualitative terms (like acronyms, jargon, proper nouns, specific classifications or levels mentioned by the user) used within the question itself that require clear definition or scope within the relevant domain to be properly understood and answered. Treat these user-provided terms as requiring explicit definition in the context unless they are universally unambiguous.
+2.  Analyze the 'context': Carefully examine the provided context. Identify all statements, facts, data points, or definitions that are directly relevant to the components identified in step 1. Assess the clarity, specificity, and completeness of this relevant information. Pay specific attention to whether the context provides explicit definitions, explanations, or scope for the key terms, criteria, and concepts identified from the 'original_user_question' in Step 1. Verify if any definition provided matches the specific domain or context implied by the question (e.g., does a general definition of a term adequately explain its specific meaning in the user's requested context?).
+3.  Compare Context to Requirements: Systematically compare the relevant information found in the 'context' against the full requirements of the 'original_user_question'. Determine if all necessary pieces of information are present and sufficiently detailed. This includes verifying that all essential terms and criteria originating from the question (identified in Step 1) are adequately defined or explained within the context specifically for the domain or context required by the question. 
+4.  Decide on Sufficiency: Based only on the comparison in step 3, conclude whether a complete and accurate answer can be constructed solely from the provided 'context'.
+5. If the user question is in conflict with returned context, consider if:
+   - Misspelling occurred
+   - Wrong term usage happened
+   - Different but equivalent terminology is used in the context.
+   - Domain-specific jargon might have multiple acceptable variations
+   If any of these issues are detected:
+   * IMMEDIATELY pivot your search approach to use the terminology found in the context
+   * When you find evidence that the user's terminology differs from the context.
+   * In all subsequent searches, use ONLY the correct terminology found in the context
+   * Do not continue making the same searches with incorrect terminology
+   * If you discover a terminology mismatch, note this finding and explain it in your reasoning
+
+Based on your assessment, you MUST output your findings using the 'Questions' Pydantic model structure. Populate the fields according to these rules:
+
+*   satisfied_reason (str):
+    *   Assess whether the given context provides enough information to fully and confidently answer the original user question. Reference the specific components of the question and analyze whether each one is addressed directly and completely by the context. Indicate if any terms or criteria from the question are used without clear, contextually appropriate definitions or explanations. If any assumptions, ambiguities, or missing pieces would require clarification or external verification, explain what they are and how they impact the completeness or reliability of the answer. Conclude clearly whether the context is sufficient, and justify that conclusion based on your analysis.
+
+*   `satisfied` (bool):
+    *   Set to `True` if, and only if, the provided 'context' contains all the necessary facts, details, logical connections, and explicit, domain-specific definitions for potentially ambiguous key terms or criteria originating from the user's question to construct a complete, unambiguous, and accurate answer to the entire 'original_user_question'.
+    *   Set to `False` if the 'context' is missing any required information, fails to provide an explicit and contextually relevant definition or clarification for essential terms or criteria used in the original question (even if related terms or general definitions exist), contains ambiguities preventing a definitive answer, lacks sufficient detail for the required analysis, or provides irrelevant information.
+
+*   `reasoning` (str):
+    *   Only fill this field if `satisfied` is `False`.
+    *   Review satisfied_reason to identify any missing or unclear information, especially undefined terms from the original_user_question. For each gap, explain why it matters—what analysis or conclusion can't be made without it. Then reflect on how the reasoning could improve: Were assumptions made too quickly? Could a different interpretation of the question have helped? Suggest how the next question could be better phrased or targeted to fill these gaps, using the context already available.
+
+*   `questions` (List[str]):
+    *   Only fill this field if `satisfied` is `False`.
+    *   Formulate a list of specific, targeted questions or search queries designed solely to acquire the missing information detailed in the `reasoning`. These questions must adhere to the following criteria:
+        *   Specific: Target the exact information gap identified. If a term from the original question lacks a specific, domain-relevant definition in the context, prioritize asking for that definition first. 
+        *   Atomic: Each question should ideally focus on acquiring a single piece of missing information or definition.
+        *   Actionable: Phrased clearly as a question or search query that can be processed.
+        *   Non-redundant: If questions was already asked try exploring different angles or phrasing to avoid redundancy.
+        *   Include Keywords: Add relevant keywords (if appropriate for the domain, like game names, specific terms) to improve search effectiveness.
+
+Important Reminders:
+*   Your entire assessment must be based strictly on the provided 'context'. Do not assume information or use external knowledge.
+*   Treat undefined or ambiguous terms, criteria, or concepts within the 'original_user_question' itself as critical information gaps if they are not explicitly explained or defined with appropriate specificity within the 'context'.
+*   Rigorously verify that the context not only mentions relevant topics but also provides the depth and clarity needed for each key term and criterion—never assume that a mere mention equates to sufficient explanation; always double-check that every concept is fully defined and meets the question’s requirements.
+*   Always try to establish more context especially regarding the definition and scope of specific terms used in the user's question to better understand the domain you are working with.
+""".strip()
+
 TERMS_EXTRACTION_PROMPT = """
 Extract terms or entities directly from the text by following these guidelines: 
 Use the exact wording from the original text, making only necessary corrections to obvious spelling mistakes. 
@@ -46,57 +103,25 @@ All provided information is not guaranteed to be relevant.
 
 
 QUERY_RESEARCH_PROMPT = """
-You are a researcher answering a user question using only the given context. 
+**Role:** You are an information extraction AI model.
 
-Instructions:
-- Use only info from the context.
-- Include all relevant details including any mentioned values or specific names. 
-- Only include information that is relevant to the researched question.
-- No assumptions or external knowledge.
-- If the context lacks relevant info, reply: "I didn't find any relevant information."
-- Answers should be condensed but extensive in answering the question in detail.
-- Answer directly. 
-""".strip()
+**Objective:** Answer the user's question using *only* the provided text context.
 
+**Core Constraints:**
+1. Context Exclusivity: Base the answer solely on the information explicitly present in the provided context document.
+2. No External Data: Do not use any external knowledge, prior training, inferred information, or assumptions.
+3. Relevance Focus: Include only information from the context that directly addresses the specific user question asked. Exclude all non-relevant information found in the context.
 
-MAIN_RESEARCHER_PROMPT = """
-You are an expert research assistant. Your primary goal is to determine if the provided 'context' contains sufficient information to fully and accurately answer the 'original_user_question'.
+**Information Extraction Requirements:**
+1. Identify Key Details: Extract all specific data points (e.g., names, numbers, percentages, dates, locations, measurements) from the context relevant to the question.
+2. Comprehensive Inclusion: Ensure all extracted relevant details are incorporated into the answer.
 
-You will be given:
-1.  The 'original_user_question'.
-2.  The 'context' which consists of information gathered so far (e.g., search results, document snippets).
+**Procedure for Unanswered Questions:**
+1. Identify Lack of Information: Determine if the context contains the necessary information to answer the question.
+2. If some information is missing, try to at least provide partial answer. 
+3. If no relevant information is present, mention that you did not find anything relevant.
+4  If there was no relevant information, provide short summary of the context.
 
-Your task is to:
-1.  Carefully analyze the 'original_user_question' to understand exactly what information is needed for a complete answer.
-2.  Thoroughly examine the provided 'context' to see what relevant information it contains.
-3.  Compare the information available in the 'context' against the requirements of the 'original_user_question'.
-4.  Decide if a complete and accurate answer can be constructed *using only the provided context*.
-
-Based on your assessment, you MUST output your findings using the 'Questions' Pydantic model structure. Populate the fields according to these rules:
-
-* **`satisfied` (bool):**
-    * Set to `True` if, and only if, the provided 'context' contains all the necessary information to construct a complete and accurate answer to the 'original_user_question'.
-    * Set to `False` if the 'context' is missing information, is ambiguous, or lacks the detail needed to fully answer the 'original_user_question'.
-
-* **`satisfied_reason` (str):**
-    * If `satisfied` is `True`, explain *specifically how* the context provides the necessary information to answer the 'original_user_question'. Point to the relevant parts of the context if possible.
-    * If `satisfied` is `False`, explain *specifically why* the context is insufficient. Clearly state what information is missing or inadequate in the context to answer the 'original_user_question'.
-
-* **`reasoning` (str):**
-    * **Only fill this field if `satisfied` is `False`.**
-    * Provide a detailed breakdown of the information gaps identified in `satisfied_reason`. Explain *why* each piece of missing information is critical for answering the 'original_user_question'. Describe the logical steps or analysis that cannot be completed due to these gaps.
-
-* **`questions` (List[str]):**
-    * **Only fill this field if `satisfied` is `False`.**
-    * Formulate a list of specific, targeted questions or search queries that aim to acquire the missing information detailed in the `reasoning`. These questions should be designed to fill the gaps and enable answering the 'original_user_question' once answered. Make the questions clear and actionable for further research.
-
-**Important:**
-* Base your assessment *strictly* on the provided 'context'. Do not use external knowledge unless it is explicitly present in the 'context'.
-* Try to establish context of the domain you are working in.
-* Each question needs to focus on a single piece of information as it will be used in a embedding search and thus needs to be atomic.
-* You can add keywords to make the subsequent search more effective. 
-* Your goal is to enable the system to either answer the question definitively now, or perform targeted follow-up research.
-* Be precise and objective in your analysis and reasoning.
 """.strip()
 
 @dataclass
@@ -114,3 +139,12 @@ class Agents:
         self.term_researcher_model.system_prompt = TERM_RESEARCHER_PROMPT
         self.query_researcher_model.system_prompt = QUERY_RESEARCH_PROMPT
 
+    def __copy__(self):
+        cls = self.__class__
+        return cls(
+            main_model=copy.copy(self.main_model),
+            main_researcher_model=copy.copy(self.main_researcher_model),
+            query_researcher_model=copy.copy(self.query_researcher_model),
+            term_researcher_model=copy.copy(self.term_researcher_model),
+            term_extraction_model=copy.copy(self.term_extraction_model),
+        )

@@ -1,7 +1,5 @@
 from typing import Dict, Any, List
 
-import numpy as np
-
 from src.models.embedding_model import EmbeddingModel
 from sentence_transformers import SentenceTransformer
 
@@ -12,9 +10,14 @@ class STEmbedding(EmbeddingModel):
     """
 
     def __init__(self, model_name, prompt:str = None, *args, **kwargs):
+        super().__init__(prompt=prompt)
+
         self.model_name = model_name
         self.model = SentenceTransformer(model_name, *args, **kwargs)
-        super().__init__(prompt=prompt)
+
+    def max_tokens(self) -> int:
+        return self.model.tokenizer.model_max_length
+
 
 
     def __copy__(self):

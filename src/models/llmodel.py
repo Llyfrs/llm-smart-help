@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class LLModel:
 
     def __init__(
-        self, model_name: str, api_key: str, endpoint: str, system_prompt: str = None
+        self, model_name: str, api_key: str, endpoint: str, system_prompt: str = None, output_cost: float = 0, input_cost: float = 0
     ):
         """
         Initialize the LLModel with model name, API key and endpoint.
@@ -21,6 +21,9 @@ class LLModel:
         self.system_prompt: str = system_prompt
 
         self.usage: Optional[CompletionUsage] = None
+
+        self.output_cost: float = output_cost
+        self.input_cost: float = input_cost
 
         self.client = OpenAI(
             base_url=endpoint,
@@ -108,3 +111,14 @@ class LLModel:
         :return: Usage information
         """
         return self.usage
+
+    def get_cost(self) -> float:
+        """
+        Get the cost of the last usage.
+        :return: Cost information
+        """
+        if self.usage is None:
+            return 0
+
+        return (self.usage.prompt_tokens / 1_000_000 ) * self.input_cost + (self.usage.completion_tokens / 1_000_000 ) * self.output_cost
+

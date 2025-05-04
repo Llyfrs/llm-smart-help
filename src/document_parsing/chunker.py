@@ -53,22 +53,22 @@ class Chunker:
         ## This makes sure the final chunks are as small as possible while maintaining stucture
         ## Any future splitting will be done in cases of overflows
         elif self.chunk_strategy == "min_tokens":
-            # Start with the root document
             queue = [document]
             processed = []
 
-            # Process until queue is empty
             while queue:
-                # Get the next item
                 item = queue.pop(0)
+
                 if isinstance(item, Document):
-                    queue.insert(0,item.sections)
+                    # Add sections individually to the front of the queue
+                    queue = list(item.sections) + queue
                 elif isinstance(item, Section):
-                    queue.insert(0,item.content)
+                    # Add contents individually to the front of the queue
+                    queue = list(item.content) + queue
                 else:
-                    processed.insert(0, item)
+                    processed.append(item)
 
-
+            # Now queue is the flattened content
             queue = processed
 
         while queue:
