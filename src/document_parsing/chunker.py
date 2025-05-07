@@ -3,12 +3,13 @@ from typing import Callable
 
 from typing import Literal
 
-from src.document_parsing.chunk import Chunk
-from src.document_parsing.bullet_list import BulletList
-from src.document_parsing.document import Document
-from src.document_parsing.paragraph import Paragraph
-from src.document_parsing.section import Section
-from src.document_parsing.table import Table
+from .chunk import Chunk
+from .document import Document
+from .bullet_list import BulletList
+from .paragraph import Paragraph
+from .section import Section
+from .table import Table
+
 
 import tiktoken
 

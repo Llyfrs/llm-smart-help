@@ -1,29 +1,23 @@
-## TODO
-
-- all config using file? to be consistend and reduce edge cases that need to be covered ? 
+# About 
 
 
-### Note from ai for creating server 
-Gotcha 😎 — in that case, you can just parameterize the host and port so the user can choose how they want to run it.
+## Installation
 
-Here’s a clean way:
+First, make sure you have uv installed. You can install it by following their guide [here](https://docs.astral.sh/uv/getting-started/installation/)
 
-python
-Copy
-Edit
-from flask import Flask
-import argparse
+Then you can run the project using:
+```bash
+uv run -m src.main --help
+```
 
-app = Flask(__name__)
+If you plan on running anything from /scripts, you can install their dependencies using:
+```bash
+uv sync --extra scripts
+```
 
-@app.route("/")
-def home():
-    return "hello"
+## Config 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5000)
-    args = parser.parse_args()
 
-    app.run(host=args.host, port=args.port)
+
+## Embedding Data 
+First step in having the AI be able answer questions about your files is to provide those files and 

@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/wiki" />
       <excludeFolder url="file://$MODULE_DIR$/items" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="uv (llm-smart-help)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

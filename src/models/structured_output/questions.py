@@ -17,6 +17,9 @@ class Question(BaseModel):
         extra = "forbid"
 
 class Questions(BaseModel):
+    """
+    Represents reasoning structure for evaluating the sufficiency of context in answering a user question and allowing for follow-up questions.
+    """
     satisfied_reason: str = Field(
         ...,
         description="Assess whether the given context provides enough information to fully and confidently answer the original user question. "

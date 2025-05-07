@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 from typing import List, Union
 
-from src.document_parsing.bullet_list import BulletList
+from .bullet_list import BulletList
 
-from src.document_parsing.image import Image
-from src.document_parsing.paragraph import Paragraph
-from src.document_parsing.table import Table
+from .image import Image
+from .paragraph import Paragraph
+from .table import Table
 
 
 @dataclass

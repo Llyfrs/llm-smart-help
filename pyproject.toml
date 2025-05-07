@@ -1,37 +1,28 @@
 [project]
-name = "llm-smart-project"
+name = "llm-smart-help"
 version = "0.1.0"
-description = ""
-package-mode = false
-packages = [{include = "src"}]
-authors = [
-    {name = "llyfr",email = "k.dreiseitl@seznam.cz"}
-]
-
-
-readme = "README.md"
-requires-python = ">=3.13"
+description = "Add your description here"
+requires-python = ">=3.12"
 dependencies = [
-    "transformers (>=4.49.0,<5.0.0)",
-    "torch (>=2.6.0,<3.0.0)",
-    "openai (>=1.66.3,<2.0.0)",
-    "beautifulsoup4 (>=4.13.3,<5.0.0)",
-    "bs4 (>=0.0.2,<0.0.3)",
-    "html2text (>=2024.2.26,<2025.0.0)",
-    "sentence-transformers (>=3.4.1,<4.0.0)",
-    "markdown-it-py (>=3.0.0,<4.0.0)",
-    "markdownify (>=1.1.0,<2.0.0)",
-    "black (>=25.1.0,<26.0.0)",
-    "psycopg2 (>=2.9.10,<3.0.0)",
-    "dotenv (>=0.9.9,<0.10.0)",
-    "nltk (>=3.9.1,<4.0.0)",
-    "toml (>=0.10.2,<0.11.0)",
-    "tiktoken (>=0.9.0,<0.10.0)",
-    "bbcode (>=1.1.0,<2.0.0)",
-    "aiohttp (>=3.11.18,<4.0.0)",
+    "black>=25.1.0",
+    "discord>=2.3.2",
+    "markdown-it-py>=3.0.0",
+    "numpy>=2.2.5",
+    "openai>=1.77.0",
+    "pex>=2.36.1",
+    "psycopg2-binary>=2.9.10",
+    "pydantic>=2.11.4",
+    "sentence-transformers>=4.1.0",
+    "tiktoken>=0.9.0",
+    "toml>=0.10.2",
+    "tqdm>=4.67.1",
 ]
 
+[project.optional-dependencies]
+scripts = [
+    "markdownify>=1.1.0",
+    "requests>=2.32.3",
+]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[project.scripts]
+main = "src.main:main"

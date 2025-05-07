@@ -1,0 +1,54 @@
+###############################################################################
+# Global settings
+###############################################################################
+POSTGRESQL_CONNECTION_STRING = "postgresql://<username>:<password>@<host>:<port>/<database>"
+GLOBAL_CONTEXT               = "All questions asked are about the <domain/context of your files> and should be answered in this context."
+
+###############################################################################
+# Default models
+###############################################################################
+[default]
+main_model            = "o4-mini"
+main_researcher_model = "o4-mini"
+# If not set, you will be asked to choose it
+# query_researcher_model = "gemini-2_5_flash"
+embedding_model       = "local_min"
+
+###############################################################################
+# Language models (via OpenRouter or OpenAI)
+###############################################################################
+[model.o4-mini]
+model_name   = "o4-mini-2025-04-16"
+base_url     = "https://api.openai.com/v1"
+api_key      = "<YOUR_OPENAI_API_KEY>"
+input_cost   = 1.10
+output_cost  = 4.40
+
+[model.gemini-2_5_flash]
+model_name   = "google/gemini-2.5-flash-preview"
+base_url     = "https://openrouter.ai/api/v1"
+api_key      = "<YOUR_OPENROUTER_API_KEY>"
+# input_cost   = 0.15 # defautls to zero
+# output_cost  = 0.60 # defaults to zero
+
+###############################################################################
+# Embedding models
+#   • Local models use sentence_transformers under the hood and need to be compatible.
+#   • Remote (non-local) models MUST define both `dimension` and `max_tokens`.
+###############################################################################
+[embedding_model.local_min]
+model_name     = "intfloat/multilingual-e5-large-instruct"
+prompt         = "Instruct: {instruction}\nQuery: {query}"
+chunk_strategy = "min_tokens"
+
+[embedding_model.local_max]
+model_name     = "intfloat/multilingual-e5-large-instruct"
+prompt         = "Instruct: {instruction}\nQuery: {query}"
+chunk_strategy = "max_tokens"
+
+[embedding_model.openai_small_max]
+model_name     = "text-embedding-3-small"
+api_key        = "<YOUR_OPENAI_API_KEY>"
+dimension      = 1536
+max_tokens     = 8192
+chunk_strategy = "max_tokens"

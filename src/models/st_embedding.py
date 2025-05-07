@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 
-from src.models.embedding_model import EmbeddingModel
+from .embedding_model import EmbeddingModel
 from sentence_transformers import SentenceTransformer
 
 

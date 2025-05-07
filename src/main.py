@@ -18,6 +18,7 @@ from src.routines.server_routine import run_server
 import toml  # assuming you're using toml to load your config
 import argparse
 
+
 def argparse_args():
     """
     This function parses command line arguments and returns them.

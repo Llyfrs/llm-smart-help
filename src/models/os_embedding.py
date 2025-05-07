@@ -3,7 +3,7 @@ from typing import Union, List
 import numpy as np
 import tiktoken
 
-from src.models.embedding_model import EmbeddingModel
+from .embedding_model import EmbeddingModel
 from openai import OpenAI
 
 
