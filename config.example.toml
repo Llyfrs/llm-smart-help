@@ -35,6 +35,7 @@ api_key      = "<YOUR_OPENROUTER_API_KEY>"
 # Embedding models
 #   • Local models use sentence_transformers under the hood and need to be compatible.
 #   • Remote (non-local) models MUST define both `dimension` and `max_tokens`.
+#   . Each model is associated wiht its own table `local_min` and `local_max` will both create new tables in the database
 ###############################################################################
 [embedding_model.local_min]
 model_name     = "intfloat/multilingual-e5-large-instruct"
