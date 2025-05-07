@@ -47,3 +47,50 @@ uv run -m src.main embedding update data
 ```
 
 
+## Running the Q&A pipline 
+
+There are multiple ways to run the Q&A pipline, in each case the process of research is the same only the way you can interact with it changes. 
+
+### CLI 
+
+Simplest interface and quick way to debug / test the system. You will be prompted to ask a question, then the models gets to work and when it comes up with an answer it will be printed with all the steps that lead to that answer. It's a bit messy, but reading the reasoning's and questions asked is good way to see what the model does't get and what prompt could improve it. 
+
+```bash
+uv run -m src.main run-cli
+```
+
+### Server
+
+Allows running the system as a server accepting queries at the endpoint `/query`, with the data format bellow. This allows for asynch processing of each query, and integration with other services. The response data contains all the information about the run, the final answer is in `final_answer`
+
+
+```bash
+# Runs server on localhost on port 12412
+uv run -m src.main run-server --address 127.0.0.1 --port 12412
+```
+
+Example of a request:
+```bash
+curl -X POST http://127.0.0.1:12412/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What are the main causes of climate change?",
+    "iterations": 5
+}'
+```
+### Discord
+
+To be implemented
+
+```bash
+# Runs server on localhost on port 12412
+uv run -m src.main run-discord --guild-id 123124 --channel-id 11124
+```
+
+## Choosing Models
+
+Internally, there are 3 different agents and they each use different model, these are the agents and my recommendation on how capable the model should be:
+
+- `main_model` - This model is responsible for the final answer, it should be able to piece together information from long context.
+- `main_researcher_model` - This model is going to iterate over the researched data and decide what data to collect next. Reasoning model that follows instructions is the best option.
+- `query_researcher_model`- Only needs to answer one question based on context, generally can be smaller. Cheap input is key for this model to keeping costs somewhat low.

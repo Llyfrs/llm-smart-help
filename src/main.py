@@ -48,9 +48,9 @@ def argparse_args():
     subparsers.add_parser("run-cli", help="Run CLI mode")
 
     # run-discord-module
-    discord_parser = subparsers.add_parser("run-discord-module", help="Run Discord module")
+    discord_parser = subparsers.add_parser("run-discord", help="Run Discord module")
     discord_parser.add_argument("--guild-id", type=int, help="Limit Discord Bot to this guild")
-    discord_parser.add_argument("--chat-id", type=str, help="Limit Discord Bot to this chat")
+    discord_parser.add_argument("--channel-id", type=str, help="Limit Discord Bot to this chat")
 
     # run-server
     server_parser = subparsers.add_parser("run-server", help="Run server mode")
