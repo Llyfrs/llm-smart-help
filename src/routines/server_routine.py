@@ -2,17 +2,8 @@ import asyncio
 import copy
 
 from aiohttp import web
-import json
-
-from src.models import EmbeddingModel
-from src.models.agents import Agents
-from src.routines.qa_pipeline import run_qa_pipeline
-from src.vectordb.vector_storage import VectorStorage
-
-_agents: Agents
-_embedding_model: EmbeddingModel
-_vector_storage: VectorStorage
-_global_prompt: str = ""
+from src.models.qna_pipline import QAPipeline
+_qan : QAPipeline = None
 
 async def handle_request(request):
     """
@@ -29,15 +20,11 @@ async def handle_request(request):
         if not user_query:
             return web.json_response({"error": "Missing 'query' field"}, status=400)
 
-        answer = await asyncio.to_thread(
-            run_qa_pipeline,
-            user_query=user_query,
-            agents=copy.copy(_agents),
-            embedding_model=_embedding_model,
-            vector_storage=_vector_storage,
-            global_prompt=_global_prompt,
-            max_iterations=iterations,
-        )
+
+        copy_qan : QAPipeline = copy.copy(_qan)
+
+        copy_qan.max_iterations = iterations
+        answer = await asyncio.to_thread(copy_qan.run, user_query)
 
         response_data = {
             "terms": {term: explanation for term, explanation in answer.terms.items()},
@@ -70,7 +57,7 @@ async def handle_request(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
-def run_server(agents, embedding_model, vector_storage, global_prompt , address="127.0.0.1", port=8080):
+def run_server(qan : QAPipeline, address="127.0.0.1", port=8080):
     """
     Starts server that listens for incoming requests and processes them using the QA pipeline.
     :param agents:  Agents object containing all the models.
@@ -81,11 +68,8 @@ def run_server(agents, embedding_model, vector_storage, global_prompt , address=
     :return:
     """
 
-    global _agents, _embedding_model, _vector_storage, _global_prompt
-    _agents = agents
-    _embedding_model = embedding_model
-    _vector_storage = vector_storage
-    _global_prompt = global_prompt
+    global _qan
+    _qan = qan
 
     app = web.Application()
     app.router.add_post("/query", handle_request)

@@ -1,73 +1,169 @@
 import discord
 import asyncio
+import copy
 
-from src.routines.qa_pipeline import run_qa_pipeline
+from src.vectordb.rating_storage import RatingStorage
 
+
+class RatingView(discord.ui.View):
+    """
+    A reusable view for recording user feedback on a bot's answer.
+    """
+    def __init__(
+        self,
+        question: str,
+        answer: str,
+        iteration: int,
+        cost: float,
+        storage: RatingStorage,
+        author_id: int,
+        replied_message: discord.Message
+    ):
+        super().__init__()
+        self.question = question
+        self.answer = answer
+        self.iteration = iteration
+        self.cost = cost
+        self.storage = storage
+        self.author_id = author_id
+        self.replied_message = replied_message
+
+    async def _validate_user(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Only the user who asked the question can rate this answer.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label='👍 Good', style=discord.ButtonStyle.success)
+    async def good(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validate_user(interaction):
+            return
+        await self.record_rating(1, interaction)
+
+    @discord.ui.button(label='👎 Bad', style=discord.ButtonStyle.danger)
+    async def bad(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validate_user(interaction):
+            return
+        await self.record_rating(0, interaction)
+
+    async def record_rating(self, score: int, interaction: discord.Interaction):
+        try:
+            self.storage.save_query(
+                query_text=self.question,
+                answer=self.answer,
+                iteration=self.iteration,
+                cost=self.cost,
+                score=score
+            )
+        except Exception as e:
+            print(f"Error saving rating: {e}")
+
+        await interaction.response.send_message('Thanks for your feedback!', ephemeral=True)
+        for child in self.children:
+            child.disabled = True
+        await self.replied_message.edit(content=self.replied_message.content, view=self)
 
 class DiscordQABot(discord.Client):
     def __init__(
-            self,
-            agents,
-            embedding_model,
-            vector_storage,
-            global_prompt=""
+        self,
+        qna_pipeline,
+        rating_storage: RatingStorage,
+        bot_token: str,
+        max_questions_per_user: int = None,
+        guild_ids=None,
+        channel_ids=None
     ):
-        super().__init__(intents=discord.Intents.default())
-        self.agents = agents
-        self.embedding_model = embedding_model
-        self.vector_storage = vector_storage
-        self.global_prompt = global_prompt
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(intents=intents)
+        self.qna_pipeline = qna_pipeline
+        self.storage = rating_storage
+        # Normalize guild_ids to ints
+        self.guild_ids = set(map(int, guild_ids)) if guild_ids else set()
+        # Normalize channel_ids to ints
+        self.channel_ids = set(map(int, channel_ids)) if channel_ids else set()
+        self.max_questions_per_user = max_questions_per_user
+        self.user_question_counts = {}
 
     async def on_ready(self):
         print(f'Logged in as {self.user}')
 
-    async def on_message(self, message):
-        # Ignore messages from the bot itself
+    async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
+        if self.guild_ids and message.guild and message.guild.id not in self.guild_ids:
+            return
+        if self.channel_ids and message.channel.id not in self.channel_ids:
+            return
 
-        # Respond only when bot is mentioned
         if self.user in message.mentions:
+            author_id = message.author.id
+            # enforce per-user limit
+            if self.max_questions_per_user is not None:
+                count = self.user_question_counts.get(author_id, 0)
+                if count >= self.max_questions_per_user:
+                    await message.reply(
+                        f"You have reached the limit of {self.max_questions_per_user} questions."
+                    )
+                    return
+                # increment count immediately to block concurrent requests
+                self.user_question_counts[author_id] = count + 1
+
             user_query = message.content.replace(f'<@{self.user.id}>', '').strip()
             if not user_query:
-                await message.channel.send("Please ask a question after mentioning me.")
+                await message.reply("Please ask a question after mentioning me.")
+                # decrement count if invalid query
+                if self.max_questions_per_user is not None:
+                    self.user_question_counts[author_id] -= 1
                 return
 
-            await message.channel.send("Thinking...")
-
-            # Run the QA pipeline (in executor for non-blocking)
+            thinking_msg = await message.reply("Thinking...")
+            local_qna = copy.copy(self.qna_pipeline)
             loop = asyncio.get_running_loop()
-            answer = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None,
-                lambda: run_qa_pipeline(
-                    user_query=user_query,
-                    agents=self.agents,
-                    embedding_model=self.embedding_model,
-                    vector_storage=self.vector_storage,
-                    global_prompt=self.global_prompt,
-                    max_iterations=5,
+                lambda: local_qna.run(
+                    user_query
                 )
             )
+            await thinking_msg.delete()
 
-            # Send final answer (and optionally extra info)
-            await message.channel.send(f"**Answer:** {answer.final_answer}")
+            response_text = (
+                f"**Answer:** {result.final_answer}\n"
+                f"Cost: {result.cost}\n"
+                f"Iterations: {len(result.satisfactions)}"
+            )
+
+            replied = await message.reply(response_text)
+            view = RatingView(
+                question=user_query,
+                answer=result.final_answer,
+                iteration=len(result.satisfactions),
+                cost=result.cost,
+                storage=self.storage,
+                author_id=author_id,
+                replied_message=replied
+            )
+            await replied.edit(view=view)
 
 
-def discord_routine(
-        agents,
-        embedding_model,
-        vector_storage,
-        global_prompt="",
-        bot_token=""
+def run_discord_routine(
+    qna_pipeline,
+    rating_storage: RatingStorage,
+    bot_token: str,
+    max_questions_per_user: int = None,
+    guild_ids=None,
+    channel_ids=None
 ):
-    """
-    Starts the Discord bot for answering questions via QA pipeline.
-    """
-    # bot_token should be securely managed (e.g., environment variable)
     client = DiscordQABot(
-        agents=agents,
-        embedding_model=embedding_model,
-        vector_storage=vector_storage,
-        global_prompt=global_prompt
+        qna_pipeline=qna_pipeline,
+        rating_storage=rating_storage,
+        bot_token=bot_token,
+        max_questions_per_user=max_questions_per_user,
+        guild_ids=guild_ids,
+        channel_ids=channel_ids
     )
     client.run(bot_token)

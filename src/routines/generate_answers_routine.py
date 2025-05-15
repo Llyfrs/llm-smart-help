@@ -4,11 +4,9 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
+from src.models.qna_pipline import QAPipeline
 
-from src.models import EmbeddingModel
-from src.models.agents import Agents
-from src.routines.qa_pipeline import run_qa_pipeline
-from src.vectordb.vector_storage import VectorStorage
+
 
 
 def load_csv(path: str):
@@ -27,15 +25,10 @@ def save_csv(path: str, data: list[dict]):
             writer.writerow(row)
 
 
-def process_question(entry, agents, embedding_model, vector_storage, global_prompt):
+def process_question(entry, qan : QAPipeline):
     try:
-        answ = run_qa_pipeline(
-            user_query=entry["query"],
-            agents=agents,
-            embedding_model=embedding_model,
-            vector_storage=vector_storage,
-            global_prompt=global_prompt,
-        )
+
+        answ = qan.run(user_query=entry["query"])
         entry["answer"] = answ.final_answer
 
         parts = []
@@ -66,10 +59,7 @@ def process_question(entry, agents, embedding_model, vector_storage, global_prom
 
 def generate_answers(
         path: str,
-        agents: Agents,
-        embedding_model: EmbeddingModel,
-        vector_storage: VectorStorage,
-        global_prompt: str = "",
+        qan: QAPipeline,
         max_workers: int = 10,
 ):
     questions = load_csv(path)
@@ -80,10 +70,7 @@ def generate_answers(
             executor.submit(
                 process_question,
                 entry=copy.deepcopy(entry),  # Avoid shared mutation
-                agents=copy.copy(agents),    # Separate agents instance per thread
-                embedding_model=embedding_model,
-                vector_storage=vector_storage,
-                global_prompt=global_prompt,
+                qan=copy.copy(qan)
             )
             for entry in questions
         ]

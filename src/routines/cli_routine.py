@@ -2,7 +2,7 @@ from typing import Type
 
 from src.models import EmbeddingModel
 from src.models.agents import Agents
-from src.routines.qa_pipeline import run_qa_pipeline
+from src.models.qna_pipline import QAPipeline
 from src.vectordb.vector_storage import VectorStorage
 
 
@@ -29,24 +29,14 @@ def colored_text(text: str, color: str) -> str:
 
 # Updated cli_routine
 def cli_routine(
-    agents: Agents,
-    embedding_model: EmbeddingModel,
-    vector_storage: VectorStorage,
-    global_prompt: str = "",
+    qna : QAPipeline
 ):
     while True:
         user_input = input("You: ")
         if user_input.lower() == "exit":
             break
 
-        answer = run_qa_pipeline(
-            user_query=user_input,
-            agents=agents,
-            embedding_model=embedding_model,
-            vector_storage=vector_storage,
-            global_prompt=global_prompt,
-            max_iterations=5,
-        )
+        answer = qna.run(user_input)
 
         for term, explanation in answer.terms.items():
             print(colored_text(f"Term: {term}", "blue"))

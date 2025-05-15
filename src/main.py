@@ -1,17 +1,19 @@
 """
 This is the main file for the project.
 """
-import copy
 from typing import Dict, Any, Union
 
 from src.document_parsing import Chunker
 from src.models import OAEmbedding, EmbeddingModel
 from src.models.agents import Agents
 from src.models.llmodel import LLModel
+from src.models.qna_pipline import QAPipeline
 from src.models.st_embedding import STEmbedding
 from src.routines.cli_routine import cli_routine
+from src.routines.discord_routine import run_discord_routine
 from src.routines.embedding_routine import embedding_routine
 from src.routines.generate_answers_routine import generate_answers
+from src.vectordb.rating_storage import RatingStorage
 from src.vectordb.vector_storage import VectorStorage
 from src.routines.server_routine import run_server
 
@@ -51,6 +53,7 @@ def argparse_args():
     discord_parser = subparsers.add_parser("run-discord", help="Run Discord module")
     discord_parser.add_argument("--guild-id", type=int, help="Limit Discord Bot to this guild")
     discord_parser.add_argument("--channel-id", type=str, help="Limit Discord Bot to this chat")
+    discord_parser.add_argument("--per-user-limit", type=int, help="Limits how many queries can one user have before being blocked")
 
     # run-server
     server_parser = subparsers.add_parser("run-server", help="Run server mode")
@@ -248,14 +251,29 @@ def main():
     global_prompt = config.get("GLOBAL_CONTEXT", "")
 
 
+
+
     storage = VectorStorage(
         name=model_name,
         dimension=embedding_model.get_dimension(),
         connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
     )
 
+    rating_storage = RatingStorage(
+        name="ratings",
+        connection_string=get_required_config(config, "POSTGRESQL_CONNECTION_STRING"),
+    )
+
+    qan = QAPipeline(
+        agents=agents,
+        embedding_model=embedding_model,
+        vector_storage=storage,
+        global_prompt=global_prompt,
+        max_iterations=config.get("ITERATIONS", 5),
+    )
+
     # Based on the command, pull in defaults from config if CLI args aren't provided
-    if args.command in ["run-discord-module", "run-server"]:
+    if args.command in ["run-server"]:
         port = get_config_or_arg(args.port, config, "port")
         address = get_config_or_arg(args.address, config, "address")
         print(f"Using port: {port}, address: {address}")
@@ -282,15 +300,32 @@ def main():
 
     if args.command == "run-cli":
         print("Running in CLI mode")
-        cli_routine(
-            agents=agents,
-            embedding_model=embedding_model,
-            vector_storage=storage,
-            global_prompt=global_prompt,
-        )
+        cli_routine(qan)
 
-    if args.command == "run-discord-module":
-        print("Running Discord module")
+    if args.command == "run-discord":
+
+        token = config.get("DISCORD_TOKEN")
+
+        limit = args.per_user_limit
+        guild_id = args.guild_id
+        channel_id = args.channel_id
+
+        print("Running in Discord mode")
+        print("Limit:", limit)
+        print("GuildID:", guild_id)
+        print("ChannelID:", channel_id)
+
+        guild_id = [guild_id] if guild_id is not None else None
+        channel_id = [channel_id] if channel_id is not None else None
+
+        run_discord_routine(
+            qna_pipeline=qan,
+            bot_token=token,
+            rating_storage=rating_storage,
+            max_questions_per_user=limit,
+            guild_ids=guild_id,
+            channel_ids=channel_id,
+        )
 
     if args.command == "run-server":
         print("Running server module")
@@ -299,10 +334,7 @@ def main():
         port = get_config_or_arg(args.port, config, "port")
 
         run_server(
-            agents=agents,
-            embedding_model=embedding_model,
-            vector_storage=storage,
-            global_prompt=global_prompt,
+            qan,
             address=address,
             port=port,
         )
@@ -310,10 +342,7 @@ def main():
     if args.command == "generate-answers":
         generate_answers(
             path=args.path,
-            agents=agents,
-            embedding_model=embedding_model,
-            vector_storage=storage,
-            global_prompt=global_prompt,
+            qan=qan
         )
 
 
