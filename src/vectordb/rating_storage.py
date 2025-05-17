@@ -4,7 +4,9 @@ import psycopg2
 
 class RatingStorage:
     """
-    QueryStorage provides a simple key/value store for queries, their answers, iteration count, cost, score, and timestamp using PostgreSQL.
+    RatingStorage provides a simple key/value store for queries, their answers,
+    iteration count, cost, score, and timestamp using PostgreSQL.
+    Allows multiple entries with the same query string.
     """
 
     def __init__(
@@ -41,21 +43,23 @@ class RatingStorage:
     def _create_table(self) -> None:
         query = f"""
         CREATE TABLE IF NOT EXISTS {self.table_name} (
-            query TEXT PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
+            query TEXT,
             answer TEXT,
             iteration INTEGER,
             cost FLOAT,
             score INTEGER CHECK (score IN (0, 1)),
             recorded_at TIMESTAMPTZ DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS idx_{self.table_name}_query ON {self.table_name} (query);
         """
         self.cursor.execute(query)
         self.connection.commit()
 
     def save_query(self, query_text: str, answer: str, iteration: int, cost: float, score: int) -> None:
         """
-        Insert or update a query record.
-        :param query_text: The unique query string.
+        Insert a new query record.
+        :param query_text: The query string.
         :param answer: The answer text.
         :param iteration: Iteration number.
         :param cost: Associated cost.
@@ -66,26 +70,22 @@ class RatingStorage:
 
         query = f"""
         INSERT INTO {self.table_name} (query, answer, iteration, cost, score, recorded_at)
-        VALUES (%s, %s, %s, %s, %s, now())
-        ON CONFLICT (query) DO UPDATE
-        SET answer = EXCLUDED.answer,
-            iteration = EXCLUDED.iteration,
-            cost = EXCLUDED.cost,
-            score = EXCLUDED.score,
-            recorded_at = now();
+        VALUES (%s, %s, %s, %s, %s, now());
         """
         self.cursor.execute(query, (query_text, answer, iteration, cost, score))
         self.connection.commit()
 
     def get_query(self, query_text: str) -> Optional[Tuple[str, int, float, int, str]]:
         """
-        Retrieve data for a given query.
+        Retrieve the most recent entry for a given query.
         :param query_text: The query string.
         :return: Tuple (answer, iteration, cost, score, recorded_at) or None if not found.
         """
         query = f"""
         SELECT answer, iteration, cost, score, recorded_at FROM {self.table_name}
-        WHERE query = %s;
+        WHERE query = %s
+        ORDER BY recorded_at DESC
+        LIMIT 1;
         """
         self.cursor.execute(query, (query_text,))
         result = self.cursor.fetchone()
@@ -93,16 +93,16 @@ class RatingStorage:
 
     def list_queries(self) -> List[str]:
         """
-        List all query strings stored in the table.
+        List all distinct query strings stored in the table.
         :return: List of query strings.
         """
-        query = f"SELECT query FROM {self.table_name};"
+        query = f"SELECT DISTINCT query FROM {self.table_name};"
         self.cursor.execute(query)
         return [row[0] for row in self.cursor.fetchall()]
 
     def delete_query(self, query_text: str) -> bool:
         """
-        Delete a query record.
+        Delete all records matching a query string.
         :param query_text: The query string to remove.
         :return: True if deletion succeeded.
         """

@@ -102,6 +102,9 @@ class DiscordQABot(discord.Client):
         if self.channel_ids and message.channel.id not in self.channel_ids:
             return
 
+        if self.user not in message.mentions:
+            return
+
         ## Check global question limit
         if self.max_questions_global is not None:
             if self.question_count >= self.max_questions_global:
@@ -112,67 +115,65 @@ class DiscordQABot(discord.Client):
             # increment count immediately to block concurrent requests
             self.question_count += 1
 
-
-        if self.user in message.mentions:
-            author_id = message.author.id
-            # enforce per-user limit
-            if self.max_questions_per_user is not None:
-                count = self.user_question_counts.get(author_id, 0)
-                if count >= self.max_questions_per_user:
-                    await message.reply(
-                        f"You have reached the limit of {self.max_questions_per_user} questions."
-                    )
-                    return
-                # increment count immediately to block concurrent requests
-                self.user_question_counts[author_id] = count + 1
-
-            user_query = message.content.replace(f'<@{self.user.id}>', '').strip()
-            if not user_query:
-                await message.reply("Please ask a question after mentioning me.")
-                # decrement count if invalid query
-                if self.max_questions_per_user is not None:
-                    self.user_question_counts[author_id] -= 1
-                return
-
-            thinking_msg = await message.reply("Thinking...")
-            local_qna = copy.copy(self.qna_pipeline)
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: local_qna.run(
-                    user_query
+        author_id = message.author.id
+        # enforce per-user limit
+        if self.max_questions_per_user is not None:
+            count = self.user_question_counts.get(author_id, 0)
+            if count >= self.max_questions_per_user:
+                await message.reply(
+                    f"You have reached the limit of {self.max_questions_per_user} questions."
                 )
+                return
+            # increment count immediately to block concurrent requests
+            self.user_question_counts[author_id] = count + 1
+
+        user_query = message.content.replace(f'<@{self.user.id}>', '').strip()
+        if not user_query:
+            await message.reply("Please ask a question after mentioning me.")
+            # decrement count if invalid query
+            if self.max_questions_per_user is not None:
+                self.user_question_counts[author_id] -= 1
+            return
+
+        thinking_msg = await message.reply("Thinking...")
+        local_qna = copy.copy(self.qna_pipeline)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: local_qna.run(
+                user_query
             )
-            await thinking_msg.delete()
+        )
+        await thinking_msg.delete()
 
-            response_text = (
-                f"{result.final_answer}\n"
-            )
+        response_text = (
+            f"{result.final_answer}\n"
+        )
 
-            # Split response if it's too long
-            response_chunks = [
-                response_text[i:i + 2000]
-                for i in range(0, len(response_text), 2000)
-            ]
+        # Split response if it's too long
+        response_chunks = [
+            response_text[i:i + 2000]
+            for i in range(0, len(response_text), 2000)
+        ]
 
-            # Send the first chunk as a reply to the original message
-            replied = await message.reply(response_chunks[0])
+        # Send the first chunk as a reply to the original message
+        replied = await message.reply(response_chunks[0])
 
-            # Send remaining chunks normally
-            for chunk in response_chunks[1:]:
-                replied = await message.channel.send(chunk)
+        # Send remaining chunks normally
+        for chunk in response_chunks[1:]:
+            replied = await message.channel.send(chunk)
 
-            # Attach rating view to the **last** message sent
-            view = RatingView(
-                question=user_query,
-                answer=result.final_answer,
-                iteration=len(result.satisfactions),
-                cost=result.cost,
-                storage=self.storage,
-                author_id=author_id,
-                replied_message=replied
-            )
-            await replied.edit(view=view)
+        # Attach rating view to the **last** message sent
+        view = RatingView(
+            question=user_query,
+            answer=result.final_answer,
+            iteration=len(result.satisfactions),
+            cost=result.cost,
+            storage=self.storage,
+            author_id=author_id,
+            replied_message=replied
+        )
+        await replied.edit(view=view)
 
 
 def run_discord_routine(
