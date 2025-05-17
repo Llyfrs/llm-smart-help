@@ -152,8 +152,19 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
     api_key = model_config.get("api_key")
     endpoint = model_config.get("base_url")
     dimension = model_config.get("dimension")
+    max_tokens = model_config.get("max_tokens")
     prompt = model_config.get("prompt")
     strategy = model_config.get("chunk_strategy", "max_tokens")
+
+    print("Loading embedding model...")
+    print( f"Model name: {name}")
+    print( f"API key: {api_key}")
+    print( f"Endpoint: {endpoint}")
+    print( f"Dimension: {dimension}")
+    print( f"Max tokens: {max_tokens}")
+    print( f"Prompt: {prompt}")
+    print( f"Chunk strategy: {strategy}")
+
 
     if strategy not in ["max_tokens", "min_tokens", "balanced"]:
         raise ValueError(f"Invalid chunk strategy: {strategy}. Choose from 'max_tokens', 'min_tokens', or 'balanced'.")
@@ -168,6 +179,7 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
             api_key=api_key,
             endpoint=endpoint,
             dimension=dimension,
+            max_tokens=max_tokens,
             prompt=prompt,
         )
 

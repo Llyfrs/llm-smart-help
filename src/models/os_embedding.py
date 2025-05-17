@@ -17,6 +17,7 @@ class OAEmbedding(EmbeddingModel):
         model_name: str,
         api_key: str,
         dimension: int,
+        max_tokens: int = 4096,
         endpoint: str = "https://api.openai.com/v1",
         prompt: str = None,
         *args,
@@ -31,6 +32,7 @@ class OAEmbedding(EmbeddingModel):
 
         self.model_name = model_name
         self.l_dimension = dimension
+        self.max_tokens = max_tokens
 
         self.client = OpenAI(base_url=endpoint, api_key=api_key, *args, **kwargs)
 
@@ -72,6 +74,12 @@ class OAEmbedding(EmbeddingModel):
         """
         return {}
 
+    def max_tokens(self) -> int:
+        """
+        Return the maximum number of tokens that can be embedded.
+        :return:
+        """
+        return self.max_tokens
 
     def get_dimension(self) -> int:
         """

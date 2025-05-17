@@ -49,7 +49,7 @@ class QAPipeline:
         qgen_prompt = ""
 
         if self.global_prompt != "":
-            qgen_prompt += "Global Context" + self.global_prompt + "\n\n"
+            qgen_prompt += "Global Context: " + self.global_prompt + "\n\n"
 
         for _ in range(self.max_iterations):
 
