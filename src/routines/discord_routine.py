@@ -132,12 +132,23 @@ class DiscordQABot(discord.Client):
             await thinking_msg.delete()
 
             response_text = (
-                f"**Answer:** {result.final_answer}\n"
-                f"Cost: {result.cost}\n"
-                f"Iterations: {len(result.satisfactions)}"
+                f"{result.final_answer}\n"
             )
 
-            replied = await message.reply(response_text)
+            # Split response if it's too long
+            response_chunks = [
+                response_text[i:i + 2000]
+                for i in range(0, len(response_text), 2000)
+            ]
+
+            # Send the first chunk as a reply to the original message
+            replied = await message.reply(response_chunks[0])
+
+            # Send remaining chunks normally
+            for chunk in response_chunks[1:]:
+                replied = await message.channel.send(chunk)
+
+            # Attach rating view to the **last** message sent
             view = RatingView(
                 question=user_query,
                 answer=result.final_answer,
