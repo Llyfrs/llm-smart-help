@@ -53,7 +53,9 @@ def argparse_args():
     discord_parser = subparsers.add_parser("run-discord", help="Run Discord module")
     discord_parser.add_argument("--guild-id", type=int, help="Limit Discord Bot to this guild")
     discord_parser.add_argument("--channel-id", type=str, help="Limit Discord Bot to this chat")
-    discord_parser.add_argument("--per-user-limit", type=int, help="Limits how many queries can one user have before being blocked")
+    discord_parser.add_argument("--per-user-limit", type=int, help="Limits how many queries can one user have before being blocked, if not set, no limit is applied")
+    discord_parser.add_argument("--global-limit", type=int,
+                                help="Limits how many queries can be asked of the bot in total. If not set, no limit is applied")
 
     # run-server
     server_parser = subparsers.add_parser("run-server", help="Run server mode")
@@ -306,12 +308,14 @@ def main():
 
         token = config.get("DISCORD_TOKEN")
 
-        limit = args.per_user_limit
+        user_limit = args.per_user_limit
+        global_limit = args.global_limit
         guild_id = args.guild_id
         channel_id = args.channel_id
 
         print("Running in Discord mode")
-        print("Limit:", limit)
+        print("Limit:", user_limit)
+        print("Global Limit:", global_limit)
         print("GuildID:", guild_id)
         print("ChannelID:", channel_id)
 
@@ -322,7 +326,8 @@ def main():
             qna_pipeline=qan,
             bot_token=token,
             rating_storage=rating_storage,
-            max_questions_per_user=limit,
+            max_questions_per_user=user_limit,
+            max_questions_global=global_limit,
             guild_ids=guild_id,
             channel_ids=channel_id,
         )

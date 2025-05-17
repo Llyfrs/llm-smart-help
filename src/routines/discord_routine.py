@@ -73,6 +73,7 @@ class DiscordQABot(discord.Client):
         rating_storage: RatingStorage,
         bot_token: str,
         max_questions_per_user: int = None,
+        max_questions_global: int = None,
         guild_ids=None,
         channel_ids=None
     ):
@@ -87,6 +88,8 @@ class DiscordQABot(discord.Client):
         self.channel_ids = set(map(int, channel_ids)) if channel_ids else set()
         self.max_questions_per_user = max_questions_per_user
         self.user_question_counts = {}
+        self.max_questions_global = max_questions_global
+        self.question_count = 0
 
     async def on_ready(self):
         print(f'Logged in as {self.user}')
@@ -98,6 +101,17 @@ class DiscordQABot(discord.Client):
             return
         if self.channel_ids and message.channel.id not in self.channel_ids:
             return
+
+        ## Check global question limit
+        if self.max_questions_global is not None:
+            if self.question_count >= self.max_questions_global:
+                await message.reply(
+                    f"The bot has reached the global limit of {self.max_questions_global} questions."
+                )
+                return
+            # increment count immediately to block concurrent requests
+            self.question_count += 1
+
 
         if self.user in message.mentions:
             author_id = message.author.id
@@ -166,6 +180,7 @@ def run_discord_routine(
     rating_storage: RatingStorage,
     bot_token: str,
     max_questions_per_user: int = None,
+    max_questions_global: int = None,
     guild_ids=None,
     channel_ids=None
 ):
@@ -174,6 +189,7 @@ def run_discord_routine(
         rating_storage=rating_storage,
         bot_token=bot_token,
         max_questions_per_user=max_questions_per_user,
+        max_questions_global=max_questions_global,
         guild_ids=guild_ids,
         channel_ids=channel_ids
     )

@@ -10,6 +10,7 @@ MAIN_MODEL_PROMPT = """
 **Context:**
 1.  A user previously asked a specific question. This user is considered context-aware regarding the subject matter (e.g., if the topic is law, they understand common terminology, slang, and mechanics). Their question is likely detail-specific, not a general inquiry.
 2.  A research team has compiled list of research questions relevant to the user query and the best answers they could find to answer them.
+3.  Global context may be provided, it adds additional information about in what context the user query is asked, and might contain instructions for how the final answer should be formulated, give these priority over the research context.
 
 **Your Task:**
 1.  Carefully analyze the provided research information.
