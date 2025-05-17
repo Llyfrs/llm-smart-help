@@ -156,15 +156,6 @@ def load_embedding_model(config: Dict[str, Any]) -> EmbeddingModel | None:
     prompt = model_config.get("prompt")
     strategy = model_config.get("chunk_strategy", "max_tokens")
 
-    print("Loading embedding model...")
-    print( f"Model name: {name}")
-    print( f"API key: {api_key}")
-    print( f"Endpoint: {endpoint}")
-    print( f"Dimension: {dimension}")
-    print( f"Max tokens: {max_tokens}")
-    print( f"Prompt: {prompt}")
-    print( f"Chunk strategy: {strategy}")
-
 
     if strategy not in ["max_tokens", "min_tokens", "balanced"]:
         raise ValueError(f"Invalid chunk strategy: {strategy}. Choose from 'max_tokens', 'min_tokens', or 'balanced'.")

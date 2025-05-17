@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List
 import copy
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.models import EmbeddingModel
 from src.models.agents import Agents
@@ -21,6 +22,19 @@ class QAPipelineResult:
     final_answer: str = ""
 
 
+def process_question(q, embed_prompt, embedding_model, vector_storage, researcher_model):
+    vec = embedding_model.embed([
+        q.question_text + " " + " ".join(q.keywords)
+    ], instruction=embed_prompt)[0].tolist()
+    docs = vector_storage.query(vec, n=10)
+    ctx = "\n".join("source:" + d.file_name + "\n" + d.content for d in docs)
+    ans = researcher_model.generate_response(
+        prompt=f"**Context:**\n{ctx}\n\nResearched Question: {q}"
+    ).strip()
+    cost = researcher_model.get_cost()
+    return q.question_text, ans, docs, cost
+
+
 class QAPipeline:
     def __init__(
         self,
@@ -37,68 +51,63 @@ class QAPipeline:
         self.max_iterations = max_iterations
 
     def run(self, user_query: str) -> QAPipelineResult:
-        """
-        🚀 Full QA pipeline from term extraction → final answer.
-        Returns QAPipelineResult.
-        """
-
         final_result = QAPipelineResult()
 
         EMBED_PROMPT = "Given user query and keywords, retrieve relevant passages that best answer asked question."
-
         qgen_prompt = ""
 
-        if self.global_prompt != "":
+        if self.global_prompt:
             qgen_prompt += "Global Context: " + self.global_prompt + "\n\n"
 
         for _ in range(self.max_iterations):
-
-            # ❓ 3) Question generation
             questions_struct: Questions = self.agents.main_researcher_model.generate_response(
                 prompt=qgen_prompt + f"'\noriginal_user_question': {user_query}", structure=Questions
             )
 
             final_result.cost += self.agents.main_researcher_model.get_cost()
-
             final_result.satisfactions.append(questions_struct)
 
-            # Check if the questions are satisfied
             if questions_struct.satisfied:
                 break
 
             final_result.iterations += 1
 
-            # 📚 4) Question research
-            question_answers: dict[str, str] = {}
-            for q in questions_struct.questions:
-                vec = self.embedding_model.embed([q.question_text + " " + " ".join(q.keywords)], instruction=EMBED_PROMPT)[0].tolist()
-                docs = self.vector_storage.query(vec, n=10)
-                ctx = "\n".join("source:" + d.file_name + "\n" + d.content for d in docs)
-                ans = self.agents.query_researcher_model.generate_response(
-                    prompt=f"**Context:**\n{ctx}\n\nResearched Question: {q}"
-                ).strip()
-                question_answers[q.question_text] = ans
-                final_result.questions[q.question_text] = ans
-                final_result.used_context.extend(docs)
-                final_result.cost += self.agents.query_researcher_model.get_cost()
+            embedding_model_copy = copy.copy(self.embedding_model)
+            researcher_model_copy = copy.copy(self.agents.query_researcher_model)
+            vector_storage = self.vector_storage  # assumed read-only
 
-            ## Asked and answered questions
+            question_answers = {}
+            with ThreadPoolExecutor() as executor:
+                futures = [
+                    executor.submit(
+                        process_question,
+                        q,
+                        EMBED_PROMPT,
+                        embedding_model_copy,
+                        vector_storage,
+                        researcher_model_copy
+                    )
+                    for q in questions_struct.questions
+                ]
+
+                for future in as_completed(futures):
+                    q_text, ans, docs, cost = future.result()
+                    question_answers[q_text] = ans
+                    final_result.questions[q_text] = ans
+                    final_result.used_context.extend(docs)
+                    final_result.cost += cost
+
             qgen_prompt += "\n\n".join(f"---\nQuestion: {q}\nAnswer: {a}\n---" for q, a in question_answers.items())
 
-        # 🏁 5) Final answer
         final_context = f"{qgen_prompt}\n\nUser Query: {user_query}"
         final_answer = self.agents.main_model.generate_response(prompt=final_context).strip()
 
         final_result.cost += self.agents.main_model.get_cost()
-
         final_result.final_answer = final_answer
 
         return final_result
 
     def __copy__(self):
-        """
-        Creates a shallow copy of QAPipeline.
-        """
         return QAPipeline(
             agents=copy.copy(self.agents),
             embedding_model=copy.copy(self.embedding_model),
