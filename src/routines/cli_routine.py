@@ -38,9 +38,8 @@ def cli_routine(
 
         answer = qna.run(user_input)
 
-        for term, explanation in answer.terms.items():
-            print(colored_text(f"Term: {term}", "blue"))
-            print(colored_text(f"Explanation: {explanation}", "yellow"))
+        for contex in answer.used_context:
+            print(colored_text(f"\nSource: {contex.file_name}", "blue"))
 
         for desision in answer.satisfactions:
             print(colored_text(f"\nSatisfied Reason: {desision.satisfied_reason}", "cyan"))

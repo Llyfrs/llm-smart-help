@@ -32,7 +32,7 @@ class OAEmbedding(EmbeddingModel):
 
         self.model_name = model_name
         self.l_dimension = dimension
-        self.max_tokens = max_tokens
+        self.l_max_tokens = max_tokens
 
         self.client = OpenAI(base_url=endpoint, api_key=api_key, *args, **kwargs)
 
@@ -79,7 +79,7 @@ class OAEmbedding(EmbeddingModel):
         Return the maximum number of tokens that can be embedded.
         :return:
         """
-        return self.max_tokens
+        return self.l_max_tokens
 
     def get_dimension(self) -> int:
         """
