@@ -19,7 +19,8 @@ class RatingView(discord.ui.View):
         author_id: int,
         replied_message: discord.Message
     ):
-        super().__init__()
+        super().__init__(timeout=3600)  # 1 hour
+
         self.question = question
         self.answer = answer
         self.iteration = iteration
@@ -95,6 +96,7 @@ class DiscordQABot(discord.Client):
         print(f'Logged in as {self.user}')
 
     async def on_message(self, message: discord.Message):
+
         if message.author == self.user:
             return
         if self.guild_ids and message.guild and message.guild.id not in self.guild_ids:
@@ -103,6 +105,9 @@ class DiscordQABot(discord.Client):
             return
 
         if self.user not in message.mentions:
+            return
+
+        if message.reference:
             return
 
         ## Check global question limit
