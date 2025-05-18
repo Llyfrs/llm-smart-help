@@ -22,7 +22,6 @@ MAIN_MODEL_PROMPT = """
 **Output Requirements:**
 * The response must directly address the user's specific original question.
 * The user only sees the final answer, under no circumstances are you allowed to leak any internal information, such as the research questions or the research context.
-* Avoid bullet points for list shorter that 5 items and write them in a row / naturally in sentence instead.
 * It must contain all necessary details derived from the relevant research data to satisfy an informed user.
 * **Assume User Expertise:** Formulate the response assuming the user has solid background knowledge of the topic. Avoid over-explaining basic concepts or terminology common to the subject (like game-specific slang or standard mechanics, if applicable). Use precise, domain-appropriate language where relevant.
 * You are allowed to not answer the question if the information is not present in the context. Do not make up or assume any information.
