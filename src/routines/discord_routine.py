@@ -143,13 +143,18 @@ class DiscordQABot(discord.Client):
         thinking_msg = await message.reply("Thinking...")
         local_qna = copy.copy(self.qna_pipeline)
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: local_qna.run(
-                user_query
+
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: local_qna.run(user_query)
             )
-        )
-        await thinking_msg.delete()
+            await thinking_msg.delete()
+            # do something with `result`
+        except Exception as e:
+            await thinking_msg.edit(content=f"An error occurred while processing your query. Feel free to try again.")
+            # Optionally log the error too
+            print(f"Error processing query: {e}")
 
         response_text = (
             f"{result.final_answer}\n"
