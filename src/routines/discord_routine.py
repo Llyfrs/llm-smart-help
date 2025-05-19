@@ -1,3 +1,5 @@
+from idlelib.rpc import response_queue
+
 import discord
 import asyncio
 import copy
@@ -151,43 +153,37 @@ class DiscordQABot(discord.Client):
             )
             await thinking_msg.delete()
 
-            response_text = (
-                f"{result.final_answer}\n"
+            response_text = f"{result.final_answer}\n"
+
+            # Split response if it's too long
+            response_chunks = [
+                response_text[i:i + 2000]
+                for i in range(0, len(response_text), 2000)
+            ]
+
+            # Send the first chunk as a reply to the original message
+            replied = await message.reply(response_chunks[0])
+
+            # Send remaining chunks normally
+            for chunk in response_chunks[1:]:
+                replied = await message.channel.send(chunk)
+
+            # Attach rating view to the **last** message sent
+            view = RatingView(
+                question=user_query,
+                answer=result.final_answer,
+                iteration=len(result.satisfactions),
+                cost=result.cost,
+                storage=self.storage,
+                author_id=author_id,
+                replied_message=replied
             )
-            # do something with `result`
+            await replied.edit(view=view)
+
         except Exception as e:
             await thinking_msg.delete()
-
-            response_text = (
-                f"Error occurred while processing your query\n"
-            )
-            # Optionally log the error too
+            await message.reply("Error occurred while processing your query")
             print(f"Error processing query: {e}")
-
-        # Split response if it's too long
-        response_chunks = [
-            response_text[i:i + 2000]
-            for i in range(0, len(response_text), 2000)
-        ]
-
-        # Send the first chunk as a reply to the original message
-        replied = await message.reply(response_chunks[0])
-
-        # Send remaining chunks normally
-        for chunk in response_chunks[1:]:
-            replied = await message.channel.send(chunk)
-
-        # Attach rating view to the **last** message sent
-        view = RatingView(
-            question=user_query,
-            answer=result.final_answer,
-            iteration=len(result.satisfactions),
-            cost=result.cost,
-            storage=self.storage,
-            author_id=author_id,
-            replied_message=replied
-        )
-        await replied.edit(view=view)
 
 
 def run_discord_routine(
