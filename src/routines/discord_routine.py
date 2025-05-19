@@ -19,7 +19,7 @@ class RatingView(discord.ui.View):
         author_id: int,
         replied_message: discord.Message
     ):
-        super().__init__(timeout=3600)  # 1 hour
+        super().__init__(timeout=None)  # 1 hour
 
         self.question = question
         self.answer = answer
