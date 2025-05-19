@@ -74,15 +74,21 @@ Your task is to:
    * Use the correct terminology found in the contexts in all future analysis.
    * Actively search for synonyms or alternative phrasings of key terms within the contexts to ensure no single snippet biases your result.
 
-Output your findings using the following Pydantic model format:
 
-* satisfied\_reason (str): Explain whether the contexts fully support answering the question, citing specific components, and highlighting evidence from at least two independent sources per major fact or term. If only a single source is available, note that further verification is required.
+# Questions Requirements:
+Generate questions that explore a topic by breaking it down into small, independent pieces.
+Focus on discovering individual facts or definitions.
+Each question should target only one idea, concept, or entity.
+Do not assume relationships between ideas — explore each idea on its own first.
+Avoid merging multiple ideas into one question.
+The goal is to surface basic knowledge before looking at connections.
 
-* satisfied (bool): True only if each required fact or definition is corroborated by two or more sources and all terms and constraints are unambiguous and sufficiently detailed within the combined contexts.
+Examples of good question structures include:
+– Defining or describing a single concept
+– Asking what types or forms of a thing exist
+– Asking who, when, where, or why about a single idea
 
-* reasoning (str): (Only if satisfied is False) Describe what is missing, unclear, or uncorroborated, why it matters, and how each gap affects the ability to answer the question.
-
-* questions (List\[str]): (Only if satisfied is False) Provide specific, actionable questions or search queries to acquire the missing or conflicting information. Ensure each is atomic, non-redundant, and focused on resolving a precise gap or discrepancy.
+Do not generate questions that assume causality, comparisons, or combinations until each idea is well understood.
   """.strip()
 
 QUERY_RESEARCH_PROMPT = """

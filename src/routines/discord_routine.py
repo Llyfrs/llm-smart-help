@@ -150,15 +150,19 @@ class DiscordQABot(discord.Client):
                 lambda: local_qna.run(user_query)
             )
             await thinking_msg.delete()
+
+            response_text = (
+                f"{result.final_answer}\n"
+            )
             # do something with `result`
         except Exception as e:
-            await thinking_msg.edit(content=f"An error occurred while processing your query. Feel free to try again.")
+            await thinking_msg.delete()
+
+            response_text = (
+                f"Error occurred while processing your query\n"
+            )
             # Optionally log the error too
             print(f"Error processing query: {e}")
-
-        response_text = (
-            f"{result.final_answer}\n"
-        )
 
         # Split response if it's too long
         response_chunks = [
