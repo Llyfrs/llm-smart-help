@@ -3,7 +3,6 @@ from idlelib.rpc import response_queue
 import discord
 import asyncio
 import copy
-
 from src.vectordb.rating_storage import RatingStorage
 
 
@@ -195,6 +194,23 @@ def run_discord_routine(
     guild_ids=None,
     channel_ids=None
 ):
+    """
+    Run a discord bot that when tagged will answer users questions using the QAPipeline. Provides users with option to rate the answer.
+    :param qna_pipeline:
+        QAPipeline instance to be used for answering questions.
+    :param rating_storage:  Storage instance to save user ratings.
+    :param bot_token:
+        Discord bot token for authentication.
+    :param max_questions_per_user:
+        Maximum number of questions a user can ask.
+    :param max_questions_global:
+        Maximum number of questions the bot can answer globally.
+    :param guild_ids:
+        List of guild IDs where the bot will be active.
+    :param channel_ids:
+        List of channel IDs where the bot will be active.
+    :return: Keeps running until interrupted.
+    """
     client = DiscordQABot(
         qna_pipeline=qna_pipeline,
         rating_storage=rating_storage,

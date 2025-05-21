@@ -1,5 +1,6 @@
 # About 
 
+This program represents a set of tools that allow for creation of topic aware system that is able to answer user questions based on provided dataset. It implements basic RAG with embedding and added iterative search to allow for deeper exploration of topics. 
 
 ## Installation
 
@@ -80,11 +81,25 @@ curl -X POST http://127.0.0.1:12412/query \
 ```
 ### Discord
 
-To be implemented
+Integrates the Q&A pipline in to a discord bot, that when mentioned will answer the user asked question. 
+You can limit it by defining discord guild and / or discord channel that it will answer in and ignore mentions anywhere else.  
+This mode was used to collect user feedback and currently comes with a rating option after each answer.
+You can set global limit to limit how many questions in total the bot is allowed to answer and per user limit to limit single user from using up all of global limit. 
 
 ```bash
-# Runs server on localhost on port 12412
-uv run -m src.main run-discord --guild-id 123124 --channel-id 11124
+# Runs Q&A pipeline inside of discord bot 
+uv run -m src.main run-discord --guild-id 123124 --channel-id 11124 --per-user-limi 5 --global-limit 100
+```
+
+## Evaluation 
+
+You can use a csv file that includes collum named `query`, to generate answer to each question and save it again in csv file. 
+This processes preservers any other existing values and saves the final product in to a new file.  
+Be warned that this process runs in parallel to speed up the generation so if order of question is important include ID field in your csv, otherwise you will lose the order. 
+
+```bash
+# generates answers for questions from csv files
+uv run -m src.main generate-answers eval_set.csv
 ```
 
 ## Choosing Models

@@ -189,8 +189,8 @@ def select_agent_models(models: Dict[str, LLModel], config: Dict) -> Agents:
     agent_roles = {
         "main_model": "Model that will use all provided information and actually answer the question to the user. "
                       "Quality of this model will impact the quality of response and preferable capable models should be chosen. ",
-        "main_researcher_model": "Generates search queries (needs good instruction following but doesn't need to be large)",
-        "query_researcher_model": "Processes search results (needs strong comprehension)",
+        "main_researcher_model": "Generates search queries, needs to be able to follow instruction and not get lost in longer context.",
+        "query_researcher_model": "Generates answers to search query, should be cheap especially on input tokens, but handles the biggest contexts",
     }
 
     selected_models = {}

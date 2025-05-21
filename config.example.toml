@@ -3,6 +3,9 @@
 ###############################################################################
 POSTGRESQL_CONNECTION_STRING = "postgresql://<username>:<password>@<host>:<port>/<database>"
 GLOBAL_CONTEXT               = "All questions asked are about the <domain/context of your files> and should be answered in this context."
+DISCORD_TOKEN                = "DISCORD_BOT_TOKEN"
+ITERATIONS                   = 10
+
 
 ###############################################################################
 # Default models

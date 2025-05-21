@@ -31,6 +31,13 @@ def colored_text(text: str, color: str) -> str:
 def cli_routine(
     qna : QAPipeline
 ):
+
+    """
+    Command Line Interface (CLI) routine for interacting with the QAPipeline.
+    :param qna:
+    :return:
+    """
+
     while True:
         user_input = input("You: ")
         if user_input.lower() == "exit":
