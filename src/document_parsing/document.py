@@ -9,6 +9,7 @@ from .section import Section
 class Document:
     """
     A class to represent a markdown document. Contains tree-like structure of sections, paragraphs, tables, images, and bullet lists.
+    To load existing document use class DocumentParser.
     """
 
     file_name: str

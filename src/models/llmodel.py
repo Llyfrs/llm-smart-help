@@ -14,6 +14,10 @@ class LLModel:
         :param model_name: Name of the model
         :param api_key: API key for authentication
         :param endpoint: Endpoint for the model
+        :param system_prompt: System prompt to be used
+        :param output_cost: Cost per token for output
+        :param input_cost: Cost per token for input
+        :return: None
         """
         self.model_name: str = model_name
         self.api_key: str = api_key

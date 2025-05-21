@@ -24,13 +24,16 @@ class DocumentParser:
     :param file_name: The name of the markdown file being parsed.
     :type file_name: str
 
-    .. code-block:: python
+    :param updated_at: The date when the document was last updated.
+    :type updated_at: datetime, optional
+
+    Example::
+
         with open("file.md", "r") as f:
             data = f.read()
             parser = DocumentParser(file_name="file.md")
             document = parser.parse(data)
             print(document)  # Print the document as markdown
-
     """
 
     def __init__(self, file_name: str, updated_at: datetime = None):
@@ -39,7 +42,6 @@ class DocumentParser:
 
     def parse(self, document: str) -> Document:
         """
-
         Parses a Markdown document into a Document object.
 
         Takes a string of markdown content and generates a Document object with metadata and content. This content can
@@ -85,6 +87,8 @@ class DocumentParser:
     ) -> List[Union[Section, Paragraph, Table, Image, BulletList]]:
         """
         Recursively parses a list of syntax tree nodes into a list of document components.
+
+        :param nodes: List of syntax tree nodes to parse.
         """
         result: List[Union[Section, Paragraph, Table, Image, BulletList]] = []
         i = 0
@@ -173,11 +177,23 @@ class DocumentParser:
 
     @staticmethod
     def _comp_tags(tag1: str, tag2: str):
+        """
+        Compares two HTML tags based on their heading level.
+        :param tag1:
+        :param tag2:
+        :return:
+        """
         tags = ["h1", "h2", "h3", "h4", "h5", "h6"]
         return tags.index(tag1) - tags.index(tag2)
 
     @staticmethod
     def _decode_inline(tokens: List[SyntaxTreeNode]) -> str:
+
+        """
+        Decodes inline tokens into a string. This is used to convert the parsed tokens
+        :param tokens:
+        :return:
+        """
 
         if tokens is None:
             return ""

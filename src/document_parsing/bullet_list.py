@@ -4,6 +4,9 @@ from typing import List
 
 @dataclass
 class BulletList:
+    """
+    BulletList is a simple class that represents a list of items in a bullet format.
+    """
     items: List[str]
 
     def __str__(self) -> str:

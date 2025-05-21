@@ -115,6 +115,14 @@ QUERY_RESEARCH_PROMPT = """
 
 @dataclass
 class Agents:
+
+    """
+    Container for the three models used in the pipeline. Mostly used to keep track of the models and their prompts.
+    1. **Main Model**: Generates the final answer to the user query.
+    2. **Main Researcher Model**: Analyzes the context and determines if it is sufficient to answer the user query.
+    3. **Query Researcher Model**: Extracts specific information from the context to answer the user query.
+    """
+
     main_model: LLModel
     main_researcher_model: LLModel
     query_researcher_model: LLModel

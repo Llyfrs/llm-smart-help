@@ -4,6 +4,9 @@ from typing import List
 
 @dataclass
 class Table:
+    """
+    Table is a simple class that represents a table in markdown format.
+    """
     caption: str
     headers: List[str]
     rows: List[List[str]]

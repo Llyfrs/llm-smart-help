@@ -10,6 +10,9 @@ from .table import Table
 
 @dataclass
 class Section:
+    """
+    Section is a simple class that represents a section in markdown format.
+    """
     title: str
     level: int
     content: List[Union[Paragraph, Table, "Section", Image, BulletList]] = field(

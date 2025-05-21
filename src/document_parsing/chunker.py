@@ -15,7 +15,9 @@ import tiktoken
 
 
 class Chunker:
-
+    """
+    The Chunker class is responsible for splitting documents into smaller chunks based on a specified chunk strategy and size.
+    """
     def __init__(
         self,
         chunk_size: int,
@@ -25,6 +27,8 @@ class Chunker:
         """
         Initialize the Chunker with a specified chunk size.
         :param chunk_size: The maximum size of each chunk
+        :param chunk_strategy: The strategy to use for chunking. Options are "max_tokens", "balanced", or "min_tokens".
+        :param tokenizer: A function that takes a string and returns a list of tokens. If None, tiktoken is used.
         """
 
         self.chunk_size = chunk_size
@@ -39,6 +43,11 @@ class Chunker:
             self.tokenizer = tokenizer
 
     def chunk(self, document: Document) -> list[Chunk]:
+        """
+        Splits a document into smaller chunks based on the specified chunk size and strategy.
+        :param document:
+        :return:
+        """
 
         chunks = []
         doc_position = 0  # Position counter for this document

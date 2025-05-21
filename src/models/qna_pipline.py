@@ -13,6 +13,11 @@ from src.vectordb.vector_storage import VectorStorage
 
 @dataclass
 class QAPipelineResult:
+
+    """
+    A class to represent the result of a question-answering pipeline. Anything besides the final answer is mostly relevant only when debugging.
+    """
+
     terms: dict[str, str] = field(default_factory=dict)
     satisfactions: List[Questions] = field(default_factory=list)
     questions: dict[str, str] = field(default_factory=dict)
@@ -23,6 +28,17 @@ class QAPipelineResult:
 
 
 def process_question(q, embed_prompt, embedding_model, vector_storage, researcher_model):
+
+    """
+    Process a single question by embedding it, querying the vector storage, and generating a response using the researcher model.
+    :param q:
+    :param embed_prompt:
+    :param embedding_model:
+    :param vector_storage:
+    :param researcher_model:
+    :return:
+    """
+
     vec = embedding_model.embed([
         q.question_text + " " + " ".join(q.keywords)
     ], instruction=embed_prompt)[0].tolist()
@@ -36,6 +52,9 @@ def process_question(q, embed_prompt, embedding_model, vector_storage, researche
 
 
 class QAPipeline:
+    """
+    A class to represent a question-answering pipeline. It uses a set of agents to generate questions, retrieve relevant passages, and provide answers.
+    """
     def __init__(
         self,
         agents: Agents,
@@ -44,6 +63,14 @@ class QAPipeline:
         global_prompt: str = "",
         max_iterations: int = 5,
     ):
+        """
+        Initialize the QAPipeline with agents, embedding model, vector storage, and optional global prompt.
+        :param agents: Agents to be used in the pipeline.
+        :param embedding_model: Embedding model to be used for embedding questions and context.
+        :param vector_storage: Vector storage to be used for retrieving relevant passages.
+        :param global_prompt:  Global context to be used in the pipeline.
+        :param max_iterations:  Maximum number of iterations for the pipeline to run.
+        """
         self.agents = agents
         self.embedding_model = embedding_model
         self.vector_storage = vector_storage
@@ -51,6 +78,13 @@ class QAPipeline:
         self.max_iterations = max_iterations
 
     def run(self, user_query: str) -> QAPipelineResult:
+
+        """
+        Executes the full question-answering pipeline, returning the final answer and any relevant information.
+        :param user_query:
+        :return:
+        """
+
         final_result = QAPipelineResult()
 
         EMBED_PROMPT = "Given user query and keywords, retrieve relevant passages that best answer asked question."
